@@ -10,19 +10,15 @@ Model tool calls execute reads or propose writes. Only the trusted Telegram call
 
 ## Private reads
 
-Usability follow-up is P0: normal-language lookup requests currently hit overly narrow entry
-classification. Fix routing and review unnecessary prompt friction without granting account
-writes or public export from read tasks. The flow below describes the current deployed boundary.
-
-The first read proposes its exact selector, original owner request and 20-result maximum in
-the approvals topic. **Approve read scope** authorizes only that selector; it does not authorize
-any write. Rejection, three-minute expiry, restart, wrong identity or message mismatch denies
-the read. The task cannot ask for a second selector after receiving private content.
-`read_scope.py` binds approved arguments to the immutable task identity. Gmail/Drive searches
+Natural-language private lookups route directly from a fresh authenticated owner task. The first
+read automatically pins its exact selector and 20-result maximum; this read-only path has no
+separate confirmation. It can return data only to the owner and cannot propose a write or public
+export. The task cannot ask for a second selector after receiving private content.
+`read_scope.py` binds arguments to the immutable task identity. Gmail/Drive searches
 permit subsequent gets only for IDs in the bounded result set. Direct-ID, calendar, contacts,
 Docs and Sheets reads pin all arguments. Exact repeated reads return cached results. A failed
 read is not retried automatically. Limits: 32 retained task scopes, 256 KiB aggregate cached
-output per task, 20 search/list results, 30-minute grant lifetime. This protects tool access,
+output per task, 20 search/list results and a 30-minute grant lifetime. This protects tool access,
 not arbitrary code inside the credentialed gateway. Existing fixed no-agent scripts remain
 under their separately reviewed standing policies.
 
@@ -59,8 +55,8 @@ Regression tests exercise actual registry dispatch, not just helper calls or reg
 
 All gateway code still shares its trust boundary and credentials. This change is enforcement
 in the exposed plugin, not isolation against gateway code compromise or other credentialed
-tools. Mandatory task checks restrict private reads by service/operation plus owner-reviewed
-selectors and returned resource IDs. Only a matching write mode may propose an action; its immutable
+tools. Mandatory task checks restrict private reads by service/operation plus a pinned initial
+selector and returned resource IDs. Only a matching write mode may propose an action; its immutable
 grant is checked again before approval consumption and execution. Task grants expire after
 30 minutes, earlier than queue retention. Read modes cannot create write approval requests.
 

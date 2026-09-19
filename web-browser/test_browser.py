@@ -3,10 +3,12 @@ import importlib.util
 from pathlib import Path
 import time
 import unittest
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 spec=importlib.util.spec_from_file_location('browser',Path(__file__).parent/'worker/browser.py')
 b=importlib.util.module_from_spec(spec);spec.loader.exec_module(b)
+plugin_spec=importlib.util.spec_from_file_location('browser_plugin',Path(__file__).parent/'gateway-plugin/__init__.py')
+plugin=importlib.util.module_from_spec(plugin_spec);plugin_spec.loader.exec_module(plugin)
 
 class URLTests(unittest.TestCase):
     def test_reject_unsafe_navigation(self):
@@ -51,4 +53,13 @@ class LifecycleTests(unittest.IsolatedAsyncioTestCase):
         worker=b.Browser();worker.session='owned'
         worker.page=type('Page',(),{'url':'http://169.254.169.254/latest/meta-data/'})()
         with self.assertRaises(ValueError): await worker.snapshot()
+
+class PluginTests(unittest.TestCase):
+    def test_registry_handler_unpacks_argument_dictionary(self):
+        ctx = Mock()
+        plugin.register(ctx)
+        handler = ctx.register_tool.call_args.kwargs['handler']
+        with patch.object(plugin, 'browse', return_value='result') as browse:
+            self.assertEqual(handler({'action': 'open', 'url': 'https://example.com'}, task_id='ignored'), 'result')
+        browse.assert_called_once_with(action='open', url='https://example.com')
 if __name__=='__main__': unittest.main()

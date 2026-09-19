@@ -3,7 +3,7 @@ import hashlib
 import json
 from pathlib import Path
 from cron.jobs import list_jobs
-from alfie_permissions import job_digest, classify, Denied, READS
+from alfie_permissions import job_digest, classify_scheduled, Denied, READS
 
 ALLOWED_SCRIPTS = {'email_watch.py', 'check_codex_subscription_quota.py'}
 
@@ -34,7 +34,7 @@ def build():
         mode = 'reviewed-script'
         if not files:
             try:
-                mode, _ = classify(job.get('prompt') or '')
+                mode, _ = classify_scheduled(job.get('prompt') or '')
                 if mode not in (*READS, 'web-read', 'chat'):
                     mode = 'blocked'
             except Denied:

@@ -48,7 +48,7 @@ def verify(root):
             run_agent.AIAgent(enabled_toolsets=['hermes-telegram'], prefill_messages=[{'content': 'Private'}])
         opts = init.call_args.kwargs
         assert opts['skip_memory'] and opts['skip_background_review'] and opts['skip_context_files']
-        assert opts['prefill_messages'] is None and opts['enabled_toolsets'] == ['websearch']
+        assert opts['prefill_messages'] is None and opts['enabled_toolsets'] == ['websearch', 'web_browser']
     finally:
         permissions.CURRENT.reset(token)
     print('PASS real agent constructor removes private context sources and unrelated tools')

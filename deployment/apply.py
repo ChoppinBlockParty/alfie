@@ -32,6 +32,7 @@ mounts=[
  '/opt/alfie/google-workspace/scripts:/opt/data/skills/productivity/google-workspace/scripts:ro',
  '/opt/alfie/google-workspace/gateway-plugin:/opt/data/plugins/google_workspace:ro',
  '/opt/alfie/web-browser/gateway-plugin:/opt/data/plugins/web_browser:ro',
+ '/opt/alfie/reminders/gateway-plugin:/opt/data/plugins/reminders:ro',
  '/opt/alfie/deployment/file_safety.py:/opt/hermes/agent/file_safety.py:ro',
  '/opt/alfie/deployment/credential_files.py:/opt/hermes/tools/credential_files.py:ro',
  '/opt/alfie/websearch/gateway-plugin:/opt/data/plugins/websearch:ro',
@@ -49,7 +50,7 @@ for mount in mounts:
     target=mount.split(':')[1]
     vol[:]=[v for v in vol if not (isinstance(v,str) and v.split(':')[1]==target)]
     vol.append(mount)
-for path in ('plugins/google_workspace','plugins/web_browser','skills/personal/public-web-browser'):
+for path in ('plugins/google_workspace','plugins/web_browser','plugins/reminders','skills/personal/public-web-browser'):
     p=root/'data'/path;p.mkdir(parents=True,exist_ok=True);os.chown(p,10000,10000)
 # An actual file target is needed for the single-file mount.
 p=root/'data/skills/personal/public-web-browser/SKILL.md'
@@ -81,7 +82,7 @@ c=yaml.safe_load(config.read_text())
 c.setdefault('cron',{})['wrap_response']=False
 c.setdefault('terminal',{})['credential_files']=[]
 plugins=c.setdefault('plugins',{})
-for name in ('websearch','google_workspace','web_browser'):
+for name in ('websearch','google_workspace','web_browser','reminders'):
     if name not in plugins.setdefault('enabled',[]): plugins['enabled'].append(name)
     plugins['disabled']=[x for x in plugins.get('disabled',[]) if x!=name]
     plugins.setdefault('entries',{})[name]={'allow_tool_override':False}
@@ -90,7 +91,7 @@ for name in ('browser','web'):
     if name not in agent.setdefault('disabled_toolsets',[]): agent['disabled_toolsets'].append(name)
 for platform,toolsets in c.get('platform_toolsets',{}).items():
     if isinstance(toolsets,list):
-        for name in ('websearch','google_workspace','web_browser'):
+        for name in ('websearch','google_workspace','web_browser','reminders'):
             if name not in toolsets: toolsets.append(name)
 # Replace on-host skill file as well; file_sync reads host-backed content inside gateway.
 shutil.copyfile(root/'google-workspace/SKILL.md',root/'data/skills/productivity/google-workspace/SKILL.md')

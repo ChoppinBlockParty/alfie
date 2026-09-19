@@ -35,7 +35,8 @@ def check(name,condition):
  if not condition: raise RuntimeError(name)
 
 discover_plugins()
-for toolset,tool in [('google_workspace','google_workspace'),('web_browser','browse'),('websearch','research')]:
+for toolset,tool in [('google_workspace','google_workspace'),('web_browser','browse'),
+                     ('websearch','research'),('reminders','reminder')]:
  check('registered '+tool,tool in registry.get_tool_names_for_toolset(toolset))
 from agent.file_safety import get_read_block_error
 from tools.credential_files import register_credential_file,get_credential_file_mounts
@@ -257,7 +258,7 @@ def main():
     task_policy=subprocess.run(['docker','exec','alfie','test','-f','/opt/hermes/alfie_permissions.py'],capture_output=True).returncode==0
     if task_policy:
         ok=run('alfie',Path('/opt/alfie/task-permissions/live_acceptance.py').read_text(),gateway=True) and ok
-        print('STATUS browser interaction disabled by task policy; denied-action checks replace browser form tests')
+        print('STATUS task policy acceptance includes bounded browser authorization; direct worker checks remain separate')
     else:
         ok=run('alfie',BROWSER,gateway=True,timeout=240) and ok
     if args.research: ok=run('alfie',RESEARCH,gateway=True,timeout=350) and ok

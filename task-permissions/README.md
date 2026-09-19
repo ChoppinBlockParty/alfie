@@ -1,51 +1,59 @@
 # Task permissions
 
 Mandatory source patches for Hermes revision 77915e344cb0cd8e20661d4a7b393f987a2eef32.
-Initial enforcement deployed on 2026-09-19; evidence is in deployment/acceptance.md.
+Initial enforcement deployed on 2026-09-19; natural-language/use-case release deployed on
+2026-09-20. Evidence is in deployment/acceptance.md.
 No new service or container.
 
-P0 usability defect: the deployed keyword classifier still rejects ordinary owner wording.
-The next release replaces that narrow fallback with validated, tool-free intent proposals and
-specific clarifications. Prefixes remain optional diagnostics, not the intended normal UI.
-Useful routine chat/lookups and fewer unnecessary prompts are explicit owner requirements;
-account-write approvals and private/public separation remain mandatory.
+The P0 usability release replaces the keyword fallback with validated, tool-free intent
+proposals and specific clarifications. Prefixes remain optional diagnostics, not the normal UI.
+Routine chat, bounded reads, public browsing, local memory and safe reminders work from ordinary
+language. Account-write approvals and private/public separation remain mandatory.
 
 The trusted gateway creates an immutable ContextVar grant from authenticated owner text before
-native command or agent dispatch. Unknown sources, internal notifications, media and unclassified
-requests fail closed. Automatic classification recognizes only unambiguous email/web read tasks;
-it cannot authorize writes. An explicit leading `mode: request` selects a fixed catalogue entry.
-Supported natural-language write requests instead propose a mode in the approvals topic. The
-authenticated owner must choose **Confirm task scope** before the agent receives that mode.
-This is not action approval: a separate frozen exact-action review is still mandatory. Suggestions
-come only from the original authenticated text, never retrieved content. Scope reviews expire
-after three minutes or restart, are message-bound and single-use, and allow four pending requests.
-Unrecognized requests remain denied; explicit prefixes remain available for precise testing.
+native command or agent dispatch. Unknown sources, internal notifications and unclassified
+requests fail closed. The classifier receives only the bounded current owner text and fixed
+catalogue through the configured provider, with no tools, history, memory or retrieved data.
+Its strict one-key JSON proposal is validated outside the model, and the original owner text—not
+model output—becomes the task brief. It may select a write mode but cannot approve or execute a
+write. A separate frozen exact-action review remains mandatory. Mixed private/public work and
+unsupported effects are refused with specific guidance. Explicit prefixes remain available for testing.
 
-Modes: email-read, calendar-read, drive-read, contacts-read, sheets-read, docs-read, web-read, chat;
-or one exact supported write operation, for example `gmail.send: ...` or `calendar.create: ...`.
+Modes: email-read, calendar-read, drive-read, contacts-read, sheets-read, docs-read, web-read,
+chat, memory-write, reminder-read and reminder-write; or one exact supported Google write,
+for example `gmail.send: ...` or `calendar.create: ...`.
 Write modes permit that operation's approval proposal, not automatic execution. Reply mode
 resolves only the selected reply target before creating an immutable send review.
 
 Grants last 30 minutes with at most 32 registered tool calls. Modes do not carry into a later
-request. Every agent task uses a fresh brief, empty conversation history, no context files or
-memory injection, no background memory review and only its permitted toolsets. Native tool calls
+request. Every agent task uses a fresh brief, empty conversation history, no project context files,
+no background memory review and only its permitted toolsets. Local memory is injected only into
+tool-free chat and memory-write modes; it never enters public or Google tasks. Native tool calls
 are checked before middleware and again at registry dispatch; custom Google/research connectors
-also check authority. Denied tools include shell, delegation, memory, skills, scheduling and
-messaging. Operational transcripts/bookkeeping still persist in the protected gateway.
+also check authority. Shell, delegation, skills, general cron administration and arbitrary
+messaging remain denied. Operational transcripts/bookkeeping still persist in the protected gateway.
 
-`web-read` currently exposes research only. The interactive browser, including open/click/fill,
-is disabled for every task mode until destination/content review can be enforced before effects.
-Research still sends public queries and reads URLs; HTTP GET alone cannot guarantee a remote
-site has no side effects. Public briefs must not contain private material: a deliberate export
-approval workflow is not yet provided. Private reads now also require an authenticated **Approve
-read scope** review of the original request and exact query/resource arguments. The first selector
-is pinned; search results grant only their returned IDs for same-service fetches. Changed queries,
+`web-read` exposes research and the disposable public browser. The browser has no private context,
+credentials, login, payment, downloads or personal-data fields; its public profile is destroyed
+after the bounded session. Page text remains untrusted. Public briefs must not contain private
+material because no export approval workflow exists. Private Google reads pin the first selector
+automatically after a fresh authenticated owner request. Search results grant only returned IDs
+for same-service fetches. Changed queries,
 unreturned IDs and new selectors require a new task, not a scope expansion from retrieved content.
 Search/list requests allow at most 20 results. Exact repeat calls return task-local cached data;
 failed reads are not automatically retried. State is bounded to 32 tasks and 256 KiB per task,
-expires with the grant and disappears on restart. Scope rejection cannot be re-proposed within
-the same task. Docs/Sheets/direct-ID reads require the exact initial resource/range review too.
-This relies on the owner assessing the selector; it is not a semantic proof of query relevance.
+expires with the grant and disappears on restart. Docs/Sheets/direct-ID reads pin their complete
+initial arguments. The initial selector is model-generated from owner text and bounded, not a
+semantic proof that every query term is ideal; returned data can never broaden it.
+
+`memory-write` exposes only bounded add/replace/remove operations against local MEMORY.md and
+USER.md. It has no retrieval, account, browser or scheduling tools, so external content cannot
+enter before the durable write. `reminder-read` and `reminder-write` expose a dedicated connector,
+not general cron. New reminders have a fixed `chat` prompt marker, owner-origin delivery and no
+scripts, monitors, skills, context chaining, work directory, alternate destination or toolsets.
+Their complete shape is revalidated at every fire. Photographs are forced to chat mode regardless
+of caption and media/OCR instructions are marked untrusted. Authenticated voice notes are
+transcribed once before classification. Other attachment types remain blocked.
 
 Cron execution checks a private frozen job fingerprint before any precheck, script or agent.
 The two supported fixed scripts additionally require unchanged source/dependency hashes. Agent
@@ -54,7 +62,7 @@ three existing agent jobs initially failed classification. Operator review found
 future reminder and two already completed/disabled reminders. The active reminder now has a
 frozen `chat` grant with no tools; the completed jobs remain disabled and ungranted. Two reviewed
 fixed scripts remain permitted. Changed definitions or script hashes fail closed until review.
-Agent cron jobs cannot obtain interactive private read scopes. Existing reviewed no-agent scripts
+Agent cron jobs cannot obtain interactive private reads. Existing reviewed no-agent scripts
 retain their separate standing policy and the tool-free reminder is unaffected.
 Fingerprints also bind schedule/repeat limits, enabled state, context sources, monitor hooks,
 model/provider snapshots, base URL, reasoning and session attachment. Mutable run counters and

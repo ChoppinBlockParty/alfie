@@ -20,20 +20,24 @@ def main():
                 ('memory', {'action': 'add', 'content': 'Never persist'}),
                 ('cronjob_manage', {'action': 'create'}),
                 ('terminal', {'command': 'false'}),
-                ('browse', {'action': 'fill', 'value': 'Never transmit'}),
-                ('browse', {'action': 'click', 'ref': 'synthetic'}),
+                ('browse', {'action': 'evaluate'}),
             ):
                 result = json.loads(registry.dispatch(tool, args))
                 assert result.get('error'), (mode, tool)
             if mode == 'email-read':
-                result = json.loads(registry.dispatch('google_workspace', {'operation': 'gmail.labels', 'arguments': {}}))
-                assert isinstance(result, dict) and result.get('error')
+                # A disposable docker-exec process has no live Telegram adapter bridge;
+                # verify policy authorization here. The operator health probe owns API health.
+                from alfie_permissions import authorize
+                authorize('google_workspace', {'operation': 'gmail.labels', 'arguments': {}})
             else:
                 result = json.loads(registry.dispatch('google_workspace', {'operation': 'gmail.labels', 'arguments': {}}))
                 assert result.get('error')
+                # Authorization only: do not start a live browser from this denial probe.
+                from alfie_permissions import authorize
+                authorize('browse', {'action': 'open'})
         finally:
             CURRENT.reset(token)
-    print('PASS email/web tasks deny sends, memory, cron, shell, fill and click; unreviewed private reads denied')
+    print('PASS email/web tasks deny sends, memory, cron, shell and unknown browser actions; bounded read/browser paths work')
     result = json.loads(registry.dispatch('google_workspace', {'operation': 'gmail.labels', 'arguments': {}}))
     assert result.get('error')
     print('PASS absent task context cannot read Google')

@@ -27,7 +27,10 @@ for mode in policy.MODES:
                     enabled_toolsets=settings['enabled_toolsets'],
                     disabled_toolsets=settings['disabled_toolsets'], quiet_mode=quiet)
                 assembly.assert_not_called()
-            expected = {'research'} if mode == 'web-read' else {'google_workspace'} if policy.MODES[mode] else set()
+            expected = ({'research', 'browse'} if mode == 'web-read' else
+                        {'memory'} if mode == 'memory-write' else
+                        {'reminder'} if mode in ('reminder-read', 'reminder-write') else
+                        {'google_workspace'} if policy.MODES[mode] else set())
             assert {d['function']['name'] for d in definitions} == expected, mode
             for definition in definitions:
                 params = definition['function']['parameters']

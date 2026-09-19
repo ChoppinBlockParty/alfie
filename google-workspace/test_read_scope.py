@@ -17,11 +17,10 @@ class ReadScopeTests(unittest.TestCase):
         token = permissions.CURRENT.set(permissions.Grant(uuid.uuid4().hex, 'email-read', '123', '123',
             'telegram', '10', 'Find synthetic booking', time.time() + 60))
         self.addCleanup(permissions.CURRENT.reset, token)
-        self.confirm = Mock(return_value=True)
         self.execute = Mock(return_value='[{"id":"selected"}]')
 
     def run_read(self, op='gmail.search', args=None):
-        return self.gate.run(op, args if args is not None else {'query': 'booking'}, self.confirm, self.execute)
+        return self.gate.run(op, args if args is not None else {'query': 'booking'}, self.execute)
 
     def test_query_pinned_results_cached_and_only_returned_ids_readable(self):
         self.run_read()
@@ -32,14 +31,16 @@ class ReadScopeTests(unittest.TestCase):
             with self.assertRaises(ValueError): self.run_read(op, args)
         self.execute.return_value = '{"body":"synthetic"}'
         self.run_read('gmail.get', {'message_id': 'selected'})
-        self.confirm.assert_called_once()
 
-    def test_rejection_never_executes_or_represents(self):
-        self.confirm.return_value = False
-        for _ in range(2):
+    def test_non_owner_task_source_never_executes(self):
+        old = permissions.current()
+        token = permissions.CURRENT.set(permissions.Grant('different', 'email-read', old.owner, old.chat,
+            'cron', '11', 'Another task', time.time()+60))
+        try:
             with self.assertRaises(ValueError): self.run_read()
-        self.execute.assert_not_called()
-        self.confirm.assert_called_once()
+            self.execute.assert_not_called()
+        finally:
+            permissions.CURRENT.reset(token)
 
     def test_malformed_results_do_not_grant_ids_and_cannot_retry(self):
         self.execute.return_value = '{"id":"selected"}'
@@ -58,13 +59,11 @@ class ReadScopeTests(unittest.TestCase):
             'telegram', '11', 'Another task', time.time()+60))
         try:
             self.run_read('gmail.get', {'message_id': 'selected'})
-            self.assertEqual(self.confirm.call_count, 2)
         finally:
             permissions.CURRENT.reset(token)
 
-    def test_confirm_expiry_rechecked_before_fetch(self):
-        self.confirm.side_effect = lambda *args: (setattr(self, 'expired', True) or True)
-        with patch.object(permissions, 'current', side_effect=[permissions.current(), permissions.current(), permissions.Denied('expired')]):
+    def test_expiry_rechecked_before_fetch(self):
+        with patch.object(permissions, 'current', side_effect=[permissions.current(), permissions.Denied('expired')]):
             with self.assertRaises(permissions.Denied): self.run_read()
         self.execute.assert_not_called()
 

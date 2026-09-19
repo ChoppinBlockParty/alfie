@@ -1,11 +1,29 @@
-# Deployment acceptance — 2026-09-19
+# Deployment acceptance — 2026-09-20
 
 ## Latest verified increments
 
-Current usability defect: the owner reports ordinary forum requests receiving the generic
-mode-prefix error. This is a classifier limitation, not evidence of forum-topic denial.
-Natural-language intent and useful clarifications are P0. A passing security test does not prove
-the assistant is usable; ordinary paraphrases must be part of the next release's acceptance.
+- Natural-language/use-case release deployed with the existing four containers and no new
+  dependency. Eight synthetic calls through the live configured subscription model correctly
+  classified email, web, Google write, memory, reminder and chat requests, rejected a mixed
+  private/public request, and treated quoted prompt-injection text as chat data. Every accepted
+  brief remained byte-for-byte the original owner text. Malformed/extra-key/unknown model output
+  fails closed in unit tests.
+- Installed overlay hashes/syntax, registry enforcement and every mode's concrete schema passed.
+  Live denial checks preserve no-context, cross-mode, write, memory, cron, shell and unknown-browser
+  denials. A real `web-read` grant opened and closed example.com in the disposable worker. Its
+  first attempt exposed a browser registry-envelope mismatch before any page opened; the gateway
+  was backed up/restarted with the adapter fix and the repeated check passed. A live read-only
+  `reminder-read` call returned the filtered safe-reminder list; no reminder or memory entry was
+  created. Existing cron policy and Google approval state were preserved.
+- Private reads now pin their first bounded selector without a confirmation card. Natural-language
+  Google writes go directly to the immutable exact-action card; the model still cannot approve or
+  execute it. Memory is isolated to chat/memory tasks. New reminders are owner-only and tool-free.
+  Voice is transcribed before classification; photographs are forced to chat-only and their
+  vision/OCR text cannot grant tools. Other attachments remain blocked. These media paths have
+  runtime/unit evidence but no new owner Telegram media smoke test in this cutover.
+
+The remaining bullets in this section record earlier increments. Later evidence above supersedes
+their statements about read-scope buttons, preliminary write-scope reviews and disabled use cases.
 
 - Exact-selector private reads, target-context write reviews and bounded retrieval are deployed
   using the existing images/containers. Installed-runtime suites: 47 Google tests, 18 permission

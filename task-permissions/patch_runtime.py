@@ -51,12 +51,15 @@ def patch(relative, source):
                                 '        init_kwargs = agent_settings(init_kwargs)\n' + anchor)
     elif relative == 'agent/system_prompt.py':
         source = prepend_body(source, 'build_system_prompt',
-                              'from alfie_permissions import system_prompt\nreturn system_prompt()')
+                              'from alfie_permissions import system_prompt\nreturn system_prompt(agent)')
     elif relative == 'agent/conversation_loop.py':
         source = prepend_body(source, 'run_conversation',
             'from alfie_permissions import current, system_prompt\n'
-            'grant = current()\nuser_message = grant.brief\nconversation_history = []\n'
-            'system_message = system_prompt()\nmoa_config = {}\n'
+            'grant = current()\noriginal_message = user_message\nuser_message = grant.brief\n'
+            'if grant.media and isinstance(original_message, str):\n'
+            '    user_message += "\\n\\n<untrusted_media_analysis>\\n" + original_message[:12000] + "\\n</untrusted_media_analysis>"\n'
+            'conversation_history = []\n'
+            'system_message = system_prompt(agent)\nmoa_config = {}\n'
             'agent._cached_system_prompt = None\nagent._gateway_turn_context_notes = ""')
     elif relative == 'gateway/run_turn_runner.py':
         anchor = '        if not (cache_lock and cache is not None):\n'

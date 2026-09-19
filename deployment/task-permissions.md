@@ -9,16 +9,17 @@ Replace the brittle classifier, not the authorization boundary. Minimize unneces
 friction while keeping selected-data limits, private/public separation and exact-action write review.
 
 Implemented: authenticated owner-text classification, immutable expiring grants, mandatory
-tool checks, fresh task context, Google approval scope checks and frozen cron fingerprints.
-Supported natural-language writes now require owner confirmation of the proposed task scope
-before granting tools, followed by a separate exact-action review. The owner two-review/rejection
-test passed. Explicit operation prefixes remain supported. Read tasks never use this upgrade path.
-Read tasks cannot propose writes. Browser interaction, memory changes, shell and delegation
-are disabled. Unknown requests/sources fail closed. The one active reminder now has an
+tool checks, fresh task context, Google approval checks and frozen cron fingerprints. A bounded
+tool-free model proposes one fixed mode and deterministic code validates it. Supported natural-
+language Google writes require only the separate exact-action review. Explicit operation prefixes
+remain supported. Read tasks cannot propose writes. Disposable public browsing, isolated local
+memory, narrow tool-free reminders, authenticated voice and chat-only photographs are enabled.
+Shell, delegation, general cron and messaging are disabled. Unknown requests/sources fail closed.
+The one pre-existing active reminder retains a
 operator-reviewed tool-free grant; two completed reminders remain disabled. Two reviewed fixed
-scripts remain permitted. Private reads now pin an owner-reviewed selector and bounded returned
-IDs; query expansion requires a new task. Private exports,
-browser interaction approvals and media handling are not implemented. The shared credentialed
+scripts remain permitted. Private reads automatically pin their first bounded selector and returned
+IDs; query expansion requires a new task. Private exports and broader attachment handling are not
+implemented. The shared credentialed
 gateway remains a trust boundary; this is not protection against arbitrary gateway code execution.
 Implement inside the existing four containers without an additional service.
 

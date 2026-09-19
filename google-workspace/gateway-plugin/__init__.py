@@ -106,8 +106,8 @@ def google_workspace(operation='', arguments=None, **_):
             return json.dumps({'error': 'Could not queue action for owner review; no change made.'})
     try:
         if _bridge is None:
-            raise ValueError('Authenticated read-scope reviews are unavailable')
-        return _reads.run(operation, arguments or {}, _bridge.confirm_read,
+            raise ValueError('Authenticated private-read policy is unavailable')
+        return _reads.run(operation, arguments or {},
                           lambda op, args: run_google(build_args(op, args)))
     except (ValueError, TypeError) as exc:
         return json.dumps({'error': str(exc)})

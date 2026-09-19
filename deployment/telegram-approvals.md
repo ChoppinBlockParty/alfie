@@ -2,9 +2,9 @@
 
 Status: Google exact-action approval handler and executor deployed in the existing gateway.
 The latest installed-runtime suite has 47 Google tests with external writes mocked. Real owner
-self-test approval/rejection, an approved Drive mutation and natural-write scope confirmation
-followed by exact-action rejection have been verified. Private-read selector reviews are deployed
-and covered by runtime tests; an owner click on the new private-read flow is not yet verified.
+self-test approval/rejection, an approved Drive mutation and natural-write exact-action rejection
+have been verified. The earlier preliminary write-scope and private-read confirmation cards were
+removed in the proportional-confirmation release; private reads pin bounded selectors automatically.
 The new layer checks an immutable matching write-mode grant before proposal and before execution;
 read tasks cannot propose writes. Task grants expire after 30 minutes. Owner end-to-end acceptance
 of the new write-mode layer passed: the owner received/approved the folder review and the
@@ -23,8 +23,8 @@ remain restricted to the dedicated approval topic. Email-watch retains its separ
 
 Also deployed: bounded query/result-ID reads, target-name and prior Sheets-value context,
 pre-execution metadata comparison, subprocess limits and read-only reconciliation tooling.
-P0 is useful natural-language routing and specific clarification instead of generic prefix errors.
-Remaining contract work: lower-friction read selection, atomic provider preconditions, direct
+Useful natural-language routing and specific clarification are deployed.
+Remaining contract work: atomic provider preconditions, direct
 email-observation promotion and isolation from arbitrary gateway code compromise. Difficult
 recovery tests remain deferred by owner direction, not delivery blockers.
 The sections below remain the target security contract, not a claim that all requirements are met.

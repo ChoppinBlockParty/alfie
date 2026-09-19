@@ -1,7 +1,8 @@
 # Alfie — security enhancement plan
 
-Date: 2026-09-19. Status: initial task modes, four-container hardening and Telegram Google approvals deployed;
-automated checks, owner self-test approval/rejection and an approved Drive mutation passed.
+Date: 2026-09-20. Status: useful natural-language modes, four-container hardening and Telegram
+Google approvals deployed; automated checks, owner self-test approval/rejection and an approved
+Drive mutation passed.
 Latest owner direction: keep the existing containers and scarce resources. Use Telegram approvals;
 gateway access is available and deployment has proceeded. This supersedes additional-service proposals
 as the immediate implementation target. The larger isolation design below remains a future option.
@@ -13,11 +14,10 @@ Use code-path reasoning and small focused checks, and distinguish those from liv
 Current deployed design remains in [main-spec](main-spec.md); prior acceptance remains in
 [deployment/acceptance](deployment/acceptance.md). Git retains the completed build plan.
 
-## P0 — usefulness and natural-language intent (next most important goal)
+## P0 — usefulness and natural-language intent (deployed)
 
 Owner requirement: the assistant must be useful, not blocked by routine permissions and rigid
-wording. Current natural-language routing is too narrow. Checkpoint current code/docs before
-changing it; do not relax exact-action account approval or private/public separation.
+wording. Deployed without relaxing exact-action account approval or private/public separation.
 
 1. Replace the narrow fallback with a tool-free intent proposal using only the authenticated
    owner's current text, fixed mode catalogue, bounded input/output and existing model/provider.
@@ -33,7 +33,13 @@ changing it; do not relax exact-action account approval or private/public separa
    and safe read-only live checks. Do not block delivery on difficult recovery exercises.
 6. Record actual deployment evidence separately from source reasoning and owner UI confirmation.
 
-This P0 work takes priority over additional isolation features or broad recovery testing.
+Deployment result: routine chat, public research/browser work, bounded private reads, local
+memory, safe reminders and voice/photo input work without mode-prefix memorization. Private
+reads pin their first bounded selector without a confirmation card. Supported Google writes go
+straight to one immutable exact-action review. Mixed private/public tasks fail with a specific
+clarification. General shell, cron, messaging, private export and unsupported attachments remain
+blocked. Next work is provider-side redirect/DNS containment and the remaining restricted
+records/observation promotion path; difficult recovery exercises remain deferred.
 
 ## Deployed four-container increment
 
@@ -64,8 +70,9 @@ Release status and remaining gates:
    whether to retain it or add an explicitly approved deletion operation. The broader audit remains open.
    A dedicated approval topic is now deployed: owner requests are accepted from any topic in the
    same configured forum, while buttons and callbacks remain restricted to the approval topic.
-   Natural-language scope confirmation is also deployed: the owner confirmed both reviews appeared
-   and the exact-action queue verifies rejection. Scope confirmation never executes an action.
+   The earlier natural-language scope confirmation was removed after its two-review test: it was
+   redundant with the exact-action card. Natural-language writes now receive only the meaningful
+   immutable action review; the exact-action queue continues to enforce rejection/execution.
 2. Initial task-scoped enforcement is deployed: forty installed-runtime policy/approval tests
    and live read/denial checks passed. Owner write-mode review/approval now has a matching
    succeeded queue record. Subsequent owner rejection and web-read smoke checks passed;
@@ -75,9 +82,10 @@ Release status and remaining gates:
    checks passed; fresh owner tasks used direct connectors without discovery errors.
    Cron review completed: one active reminder has a frozen tool-free grant; two completed
    reminders stay disabled. Fixed-script grants and all schedules are unchanged. Restore
-   usability only through reviewed resource scopes, explicit exports, media provenance and
-   exact-action browser approvals. Fresh task history/memory isolation and disabled browser,
-   shell, scheduling and memory tools are intentional current restrictions. See
+   usability only through bounded resource scopes and explicit exports. Fresh task history is
+   retained; public tasks exclude private memory. Disposable public browsing, isolated local
+   memory, narrow tool-free reminders, authenticated voice and chat-only photographs are restored.
+   Shell, general scheduling and messaging remain disabled. See
    [task permissions](deployment/task-permissions.md) for implementation and remaining contract.
 3. Research access-token delivery is removed. A fixed gateway broker handles bounded, job-bound
    inference over the existing mutual-TLS connection; all 34 installed-worker tests and live
@@ -95,8 +103,8 @@ Release status and remaining gates:
    closed. Google streaming output/process-group limits are deployed. Complete
    provider-specific outcome evidence and atomic preconditions where available. Target enrichment,
    pre-execution context comparison, nested argument validation, literal Sheets values and a
-   read-only reconciliation helper are deployed. Private reads now require exact-selector owner
-   approval and permit only bounded returned IDs afterward. Private exports remain disabled.
+   read-only reconciliation helper are deployed. Private reads pin the first bounded selector and
+   permit only bounded returned IDs afterward, without a redundant review. Private exports remain disabled.
    Expanded cron fingerprints are deployed; all five existing definitions match, three grants
    remain permitted and two completed reminders remain disabled. No jobs were executed in tests.
 
@@ -116,8 +124,8 @@ The current release includes live SSH inspection, pinned Hermes source review an
 acceptance; it is not proof that prompt injection is impossible. The findings table below records
 the pre-hardening baseline and longer-term design, not a claim that all listed weaknesses remain
 unchanged. Current deployed controls and test limits are in the status above, main-spec.md and
-deployment/acceptance.md. Voice/media processing is currently blocked at task entry; a full audit
-is required before restoring it. Do not assume an untested path is safe.
+deployment/acceptance.md. Authenticated voice notes and chat-only photographs have a tested narrow
+path; documents, ordinary audio files and video remain blocked. Do not assume an untested path is safe.
 
 Threats include indirect prompt injection, cross-task data disclosure, poisoned persistent memory,
 misused credentials, unsafe parsing, dependency compromise, denial of service and lost backups.

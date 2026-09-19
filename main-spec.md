@@ -1,6 +1,6 @@
 # Alfie — current specification
 
-Spec version: 0.44. Updated: 2026-09-19.
+Spec version: 0.45. Updated: 2026-09-20.
 
 Self-hosted personal AI agent with Telegram, memory, reminders, email and public-web research.
 This document describes the whole system and current decisions. Subsystem READMEs own their
@@ -9,15 +9,15 @@ Public-release cleanup and its remaining history gate are in [publication-plan.m
 
 ## 1. Status
 
-Highest-priority next release: useful natural-language task routing. The current rule-based
-classifier rejects ordinary owner wording with a generic mode-prefix error. This is a known
-usability defect, not a forum-topic authorization failure. Users must not normally need prefixes.
-Usefulness is a core requirement: routine chat/lookups should work, and confirmations should be
-proportionate to effects. Model intent proposals must not authorize writes or mix private data
-with public research. Current enforcement remains deployed until the replacement is verified.
+Useful natural-language task routing is deployed. A bounded, tool-free model call sees only the
+authenticated owner's current text and proposes one entry from a fixed catalogue; deterministic
+code validates the complete JSON response. It receives no history, retrieved content, memory,
+tools or additional credentials, and its text never becomes the task brief. Ordinary chat, reads,
+public browsing, memory and reminders do not require mode prefixes. Mixed private/public work and
+unsupported effects get specific clarification. Explicit prefixes remain a diagnostic interface.
 
 The four-container browser/security build and initial task permissions are deployed on the VPS.
-Public research uses its worker; interactive browsing is disabled by task policy. Google operations run in the gateway without
+Public research and disposable interactive browsing use its worker. Google operations run in the gateway without
 forwarding credentials to the command sandbox. Live acceptance passed on 2026-09-19;
 measurements and test limits are in [deployment/acceptance.md](deployment/acceptance.md).
 
@@ -29,26 +29,30 @@ The first proposal exposed a dispatcher mismatch; after the deployed fix, the ap
 action succeeded and a read-only search found exactly one matching folder.
 
 Mandatory task grants now gate Telegram entry, cron entry, agent context and tool dispatch.
-Unambiguous email/web read requests receive read-only modes; supported natural-language writes
-require a Telegram task-scope confirmation, then separate exact-action approval. Explicit exact
-operation prefixes remain available. Read tasks cannot propose writes. Every task
-has fresh context: prior conversation, personal memory/context files and background memory
-updates are disabled. Shell, browser interaction, delegation, scheduling and messaging tools
-are unavailable. Media, slash-command and unsupported-source agent tasks fail closed.
+Natural-language requests receive one fixed task mode. Supported Google writes proceed directly
+to the separate immutable exact-action review; the earlier redundant task-scope confirmation was
+removed. Read tasks cannot propose writes. Every task has fresh history and no project context or
+background memory updates. Public tasks receive no private memory or Google tools. Chat and
+memory-edit tasks alone may load the bounded local memory snapshot; only memory-edit tasks can
+change it. Shell, delegation, general scheduling and messaging tools remain unavailable.
+Voice notes are transcribed before classification. Photographs are chat-only and vision/OCR text
+is explicitly untrusted; documents, audio files and video remain blocked.
 The one active reminder has a reviewed tool-free grant; two completed reminders remain disabled.
 Two hash-checked fixed scripts remain permitted. Schedules and destinations were preserved.
-These restrictions override the broader use-case catalogue below.
+New reminders use a narrow connector that forces owner delivery and tool-free jobs; it cannot
+schedule scripts, monitors, alternate destinations, tools or chained context. Existing reviewed
+cron jobs retain their frozen grants.
 See [task-permissions/README.md](task-permissions/README.md) for modes and limitations.
-Private reads now require a separate exact-selector approval, with bounded returned-ID access
-and no in-task query expansion. Approved exports, safe browser interactions and isolation against
-gateway code compromise remain open. Installed-runtime policy/approval tests passed;
-live read/denial checks passed. The owner received and approved a write-mode folder review;
-the approval database records success with the matching task grant. Remaining owner smoke
-checks and evidence limits are recorded in deployment/acceptance.md.
+Private reads automatically pin the first bounded selector from the fresh owner task, with
+returned-ID access and no in-task query expansion. Public browsing runs only in the credential-free
+disposable worker and cannot receive private task context. Private exports and isolation against
+gateway code compromise remain open. Installed-runtime schemas, denial paths, a real public
+browser open/close, reminder listing and synthetic intent proposals passed after deployment.
+Existing exact-action Google approval evidence remains valid.
 See [plan-next](plan-next.md) for remaining work; this is not maximum-security completion.
 
-The natural-language two-review smoke test passed: the owner confirmed scope and rejected the
-exact action; private queue state verifies rejection. Research model credentials now stay in the
+The prior natural-language two-review smoke test verified the exact action was rejected; the
+preliminary scope review has since been removed as redundant. Research model credentials stay in the
 gateway behind a job-bound broker; stalled worker jobs are terminated. Google subprocesses have
 streaming output limits and process-group deadlines. Firewall-first container startup passed a
 real host reboot. An encrypted Drive backup passed read-back and offline data/approval recovery
@@ -80,6 +84,7 @@ tests are deferred by owner direction and are not implementation release blocker
 | `sandbox/` | Shell/file/code execution over SSH in the command container |
 | `web-search/` | Search/read/analyse loop and shared worker server/image |
 | `web-browser/` | Interactive public browsing; shares the research worker container |
+| `reminders/` | Narrow owner-only reminder connector over validated tool-free cron jobs |
 | `egress/` | Squid destination policy |
 | `deployment/` | Four-container cutover, resource limits, firewall and acceptance checks |
 
@@ -287,13 +292,12 @@ and numbered email titles, unindented details and an explicit Open email link.
 
 ## 7. Remaining work
 
-- P0: replace brittle intent recognition and generic prefix errors with validated, tool-free
-  natural-language proposals and specific clarifications. Reduce unnecessary permission friction;
-  preserve task isolation and exact-action write approval. See the P0 plan before other enhancements.
+- P0 natural-language routing and proportional confirmation friction are deployed. Continue
+  paraphrase/use-case regression testing while preserving task isolation and exact-action approval.
 - Extend the deployed [task permissions contract](deployment/task-permissions.md): classify
   every source before execution; bind readable data, permitted actions/destinations and durable
   state changes independently. Email search cannot propose sends; public research cannot write
-  personal memory or accounts. Service/operation and owner-reviewed selector/result-ID enforcement
+  personal memory or accounts. Service/operation and pinned selector/result-ID enforcement
   are deployed. Reviewed private exports remain unavailable.
 - Decide whether to retain or separately approve deletion of the synthetic Drive test folder.
 - Enforce private/public task modes across all tools; audit alternate gateway write/memory/scheduling

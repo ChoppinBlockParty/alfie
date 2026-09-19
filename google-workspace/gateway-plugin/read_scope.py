@@ -1,4 +1,4 @@
-"""Task-local read capabilities. Only the authenticated owner can approve the initial selector."""
+"""Task-local private reads pinned to the first bounded selector in an owner task."""
 import json
 import threading
 import time
@@ -21,11 +21,11 @@ def canonical(operation, arguments):
     return args, json.dumps([operation, args], sort_keys=True, ensure_ascii=True, allow_nan=False)
 
 
-def run(operation, arguments, confirm, execute):
+def run(operation, arguments, execute):
     from alfie_permissions import authorize, current
     grant = authorize('google_workspace', {'operation': operation, 'arguments': arguments})
     if grant.source != 'telegram':
-        raise ValueError('Private reads require an owner-reviewed Telegram resource scope')
+        raise ValueError('Private reads require a fresh authenticated owner task')
     args, selector = canonical(operation, arguments)
     with _lock:
         for key, state in list(_states.items()):
@@ -42,11 +42,12 @@ def run(operation, arguments, confirm, execute):
             raise ValueError('Read task identity changed')
         if state['selector'] is None:
             if state['attempted']:
-                raise ValueError('Read scope was denied or failed; start a new task')
+                raise ValueError('Private read failed; start a new task')
             state['attempted'] = True
-            if not confirm(operation, args, grant):
-                raise ValueError('Read scope not approved; no private data fetched')
-            current()  # Never execute a scope that expired during the review.
+            # The mode was selected from the authenticated owner's current message before
+            # any private data was loaded. Pin the model's first bounded selector; later
+            # untrusted results can only fetch IDs returned by that exact search.
+            current()
             state['selector'] = selector
             state['child'] = {'gmail.search': ('gmail.get', 'message_id'),
                               'drive.search': ('drive.get', 'file_id')}.get(operation)
@@ -54,7 +55,7 @@ def run(operation, arguments, confirm, execute):
             child = state['child']
             if not child or operation != child[0] or set(args) != {child[1]} \
                     or args[child[1]] not in state['ids']:
-                raise ValueError('Read exceeds the approved selector or returned resource IDs; start a new task')
+                raise ValueError('Read exceeds the initial selector or returned resource IDs; start a new task')
         if selector in state['cache']:
             return state['cache'][selector]
         # Reserve before execution: failure cannot trigger an automatic retry or new search.
