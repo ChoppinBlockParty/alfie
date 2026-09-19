@@ -1,0 +1,7 @@
+name: google_workspace
+version: 1.0.0
+description: Fixed Google operations without forwarding credentials to the sandbox.
+author: Alfie
+kind: backend
+provides_tools:
+  - google_workspace

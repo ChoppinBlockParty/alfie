@@ -1,0 +1,7 @@
+name: websearch
+version: 1.0.0
+description: "research(question, depth) — runs a multi-round web research loop in the isolated websearch container and returns a compact brief. Page text never enters the agent's context; the worker holds no credential of its own."
+author: Alfie
+kind: backend
+provides_tools:
+  - research

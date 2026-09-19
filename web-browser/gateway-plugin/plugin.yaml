@@ -1,0 +1,7 @@
+name: web_browser
+version: 1.0.0
+description: Disposable interactive public browsing in the research worker.
+author: Alfie
+kind: backend
+provides_tools:
+  - browse
