@@ -55,12 +55,13 @@ class RegistrationTests(unittest.TestCase):
             self.run_registration([])
 
     def test_stdin_destination_and_validation(self):
-        values = {'EMAIL_WATCH_CHAT_ID': '-100', 'EMAIL_WATCH_THREAD_ID': '3', 'EMAIL_WATCH_USER_ID': '200'}
+        values = {'EMAIL_WATCH_CHAT_ID': '-100', 'EMAIL_WATCH_THREAD_ID': '3',
+                  'ALFIE_OWNER_TELEGRAM_USER_ID': '200'}
         module = self.run_registration([], values)
         self.assertEqual(module.create_job.call_args.kwargs['origin']['chat_id'], '-100')
         for bad in ('', 'wrong', '200; id'):
             with self.subTest(bad=bad), self.assertRaises(SystemExit):
-                self.run_registration([], dict(values, EMAIL_WATCH_USER_ID=bad))
+                self.run_registration([], dict(values, ALFIE_OWNER_TELEGRAM_USER_ID=bad))
 
 
 if __name__ == '__main__':

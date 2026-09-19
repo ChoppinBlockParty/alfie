@@ -18,8 +18,8 @@
       `python3 deployment/check_sensitive.py --staged`.
 - [x] Verify 65 local tests, Bash/POSIX shell syntax, rendered Python syntax, ignore coverage,
       and a clean working-tree sensitive-data scan. Existing unrelated user edits are preserved.
-- [ ] Deploy and perform live acceptance in a maintenance window. Local changes are not
-      evidence of deployment. Existing on-host rendered rules retain their private values.
+- [x] Deploy and perform live acceptance in a maintenance window. See deployment/acceptance.md
+      for current evidence and limitations. On-host rendered rules retain private values.
 
 Generic private network ranges, container service names, default installation paths, required
 ports, dependency versions and documented security boundaries remain public implementation

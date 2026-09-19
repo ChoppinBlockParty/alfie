@@ -47,7 +47,7 @@ SCOPES = [
     "https://www.googleapis.com/auth/gmail.send",
     "https://www.googleapis.com/auth/gmail.modify",
     "https://www.googleapis.com/auth/calendar",
-    "https://www.googleapis.com/auth/drive",
+    "https://www.googleapis.com/auth/drive.file",
     "https://www.googleapis.com/auth/contacts.readonly",
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/documents",
@@ -72,11 +72,11 @@ def _stored_token_scopes() -> list[str]:
     try:
         data = json.loads(TOKEN_PATH.read_text(encoding="utf-8"))
     except Exception:
-        return list(SCOPES)
+        raise ValueError('Cannot read authorized scope metadata') from None
     scopes = data.get("scopes")
     if isinstance(scopes, list) and scopes:
         return scopes
-    return list(SCOPES)
+    raise ValueError('Authorized scope metadata is required; operator reconciliation needed')
 
 
 def _gws_binary() -> str | None:
@@ -324,11 +324,26 @@ def gmail_get(args):
 
 
 
+def gmail_reply_target(args):
+    service = build_service("gmail", "v1")
+    original = service.users().messages().get(
+        userId="me", id=args.message_id, format="metadata",
+        metadataHeaders=["From", "Subject", "Message-ID"],
+    ).execute()
+    headers = _headers_dict(original)
+    print(json.dumps({"from": headers.get("from", ""), "subject": headers.get("subject", ""),
+                      "message_id_header": headers.get("message-id", ""),
+                      "threadId": original["threadId"]}))
+
+
 def gmail_send(args):
     if _gws_binary():
         message = MIMEText(args.body, "html" if args.html else "plain")
         message["To"] = args.to
         message["Subject"] = args.subject
+        if getattr(args, 'in_reply_to', ''):
+            message['In-Reply-To'] = args.in_reply_to
+            message['References'] = args.in_reply_to
         if args.cc:
             message["Cc"] = args.cc
         if args.from_header:
@@ -351,6 +366,9 @@ def gmail_send(args):
     message = MIMEText(args.body, "html" if args.html else "plain")
     message["To"] = args.to
     message["Subject"] = args.subject
+    if getattr(args, 'in_reply_to', ''):
+        message['In-Reply-To'] = args.in_reply_to
+        message['References'] = args.in_reply_to
     if args.cc:
         message["Cc"] = args.cc
     if args.from_header:
@@ -579,7 +597,8 @@ def calendar_delete(args):
 
 
 def drive_search(args):
-    query = args.query if args.raw_query else f"fullText contains '{args.query}'"
+    escaped = args.query.replace('\\', '\\\\').replace("'", "\\'")
+    query = args.query if args.raw_query else f"fullText contains '{escaped}'"
     if _gws_binary():
         results = _run_gws(
             ["drive", "files", "list"],
@@ -886,7 +905,7 @@ def sheets_update(args):
             params={
                 "spreadsheetId": args.sheet_id,
                 "range": args.range,
-                "valueInputOption": "USER_ENTERED",
+                "valueInputOption": "RAW",
             },
             body=body,
         )
@@ -896,7 +915,7 @@ def sheets_update(args):
     service = build_service("sheets", "v4")
     result = service.spreadsheets().values().update(
         spreadsheetId=args.sheet_id, range=args.range,
-        valueInputOption="USER_ENTERED", body=body,
+        valueInputOption="RAW", body=body,
     ).execute()
     print(json.dumps({"updatedCells": result.get("updatedCells", 0), "updatedRange": result.get("updatedRange", "")}, indent=2))
 
@@ -912,7 +931,7 @@ def sheets_append(args):
             params={
                 "spreadsheetId": args.sheet_id,
                 "range": args.range,
-                "valueInputOption": "USER_ENTERED",
+                "valueInputOption": "RAW",
                 "insertDataOption": "INSERT_ROWS",
             },
             body=body,
@@ -923,7 +942,7 @@ def sheets_append(args):
     service = build_service("sheets", "v4")
     result = service.spreadsheets().values().append(
         spreadsheetId=args.sheet_id, range=args.range,
-        valueInputOption="USER_ENTERED", insertDataOption="INSERT_ROWS", body=body,
+        valueInputOption="RAW", insertDataOption="INSERT_ROWS", body=body,
     ).execute()
     print(json.dumps({"updatedCells": result.get("updates", {}).get("updatedCells", 0)}, indent=2))
 
@@ -1085,7 +1104,12 @@ def main():
     p.add_argument("--from", dest="from_header", default="", help="Custom From header (e.g. '\"Agent Name\" <user@example.com>')")
     p.add_argument("--html", action="store_true", help="Send body as HTML")
     p.add_argument("--thread-id", default="", help="Thread ID for threading")
+    p.add_argument("--in-reply-to", default="", help="Frozen reviewed Message-ID header")
     p.set_defaults(func=gmail_send)
+
+    p = gmail_sub.add_parser("reply-target")
+    p.add_argument("message_id")
+    p.set_defaults(func=gmail_reply_target)
 
     p = gmail_sub.add_parser("reply")
     p.add_argument("message_id", help="Message ID to reply to")

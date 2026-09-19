@@ -4,6 +4,7 @@ import argparse
 import json
 import subprocess
 import sys
+from pathlib import Path
 
 
 def run(container, code, *, gateway=False, timeout=120):
@@ -48,13 +49,21 @@ check('real Hermes backend SSH',kind=='ssh' and type(env).__name__=='SSHEnvironm
 result=env.execute("python3 -c 'from pathlib import Path; paths=[Path(\"/opt/data/.env\"),Path(\"/opt/data/auth.json\"),Path.home()/\".hermes/google_token.json\",Path.home()/\".hermes/google_client_secret.json\",Path(\"/var/run/docker.sock\")]; print(\"CLEAN\" if not any(p.exists() for p in paths) else \"EXPOSED\")'")
 check('sandbox credentials absent through Hermes', 'CLEAN' in str(result) and 'EXPOSED' not in str(result))
 google=load('google_acceptance','/opt/data/plugins/google_workspace/__init__.py')
-result=google.google_workspace('gmail.labels',{})
+from unittest.mock import patch
+with patch.object(google, 'bounded_run', side_effect=AssertionError('write attempted execution')), \
+     patch.object(google._approvals, 'propose', return_value={'status':'pending_approval'}):
+ result=json.loads(google.google_workspace('calendar.delete', {'event_id':'synthetic-fixture'}, approved=True))
+ check('Google mutations cannot bypass pending review',result.get('status')=='pending_approval')
+result=json.loads(google.google_workspace('gmail.labels',{}))
+check('Google private read denied without owner scope',bool(result.get('error')))
+# Explicit operator health probe of the fixed CLI, not a model task or scope bypass.
+result=google.run_google(['gmail','labels'])
 try: payload=json.loads(result)
 except ValueError: payload={}
 if isinstance(payload,dict) and payload.get('error'):
- check('Google labels read succeeds',False)
+ check('Operator Google labels health read succeeds',False)
 else:
- check('Google labels read succeeds',bool(payload))
+ check('Operator Google labels health read succeeds',bool(payload))
 # Native web/browser must be disabled while custom plugin toolsets remain enabled.
 import yaml
 config=yaml.safe_load(pathlib.Path('/opt/data/config.yaml').read_text())
@@ -62,6 +71,16 @@ check('native gateway web/browser disabled',{'web','browser'} <= set(config['age
 from cron.jobs import list_jobs
 jobs=[j for j in list_jobs(include_disabled=True) if j.get('name')=='email-watch']
 check('email-watch remains no_agent',len(jobs)==1 and jobs[0].get('no_agent') is True)
+# Import the actual deployed script and ensure its legacy timezone command has no effect.
+import sys
+sys.path.insert(0,'/opt/data/scripts')
+watch=load('watch_acceptance','/opt/data/scripts/email_watch.py')
+check('email-watch report-only implementation installed',
+      hasattr(watch,'validate_results') and not hasattr(watch,'ensure_event'))
+before=watch.USER_MD.read_bytes() if watch.USER_MD.exists() else None
+check('email-watch automatic timezone updates disabled',watch.update_zone() is None)
+after=watch.USER_MD.read_bytes() if watch.USER_MD.exists() else None
+check('email-watch preserves owner context',before==after)
 '''
 
 SANDBOX = r'''
@@ -179,6 +198,10 @@ finally: call(action='close',session_id=sid)
 
 RESEARCH = r'''
 import importlib.util
+import time
+if importlib.util.find_spec('alfie_permissions'):
+ from alfie_permissions import CURRENT, Grant
+ CURRENT.set(Grant('public-acceptance','web-read','synthetic','synthetic','operator-acceptance','synthetic','Public example domain research',time.time()+600))
 spec=importlib.util.spec_from_file_location('research_acceptance','/opt/data/plugins/websearch/__init__.py')
 p=importlib.util.module_from_spec(spec);spec.loader.exec_module(p)
 text=p._research('What is the purpose of the example.com domain? Cite IANA.', 'quick')
@@ -201,6 +224,23 @@ def main():
     assert worker['HostConfig']['Memory']==worker['HostConfig']['MemorySwap']==1280*1024*1024
     assert worker['HostConfig']['ReadonlyRootfs']
     print('PASS four running containers; no Docker socket; worker RAM/no-swap/read-only controls')
+    if Path('/etc/systemd/system/alfie-boot-gate.service').exists():
+        from boot_gate import check_policies
+        check_policies(inspections)
+        for unit in ('alfie-docker-firewall.service', 'alfie-boot-gate.service'):
+            subprocess.run(['systemctl', 'is-active', '--quiet', unit], check=True)
+        def timestamp(unit, field):
+            return int(subprocess.check_output(['systemctl', 'show', unit, '-p', field, '--value'], text=True).strip())
+        firewall_done=timestamp('alfie-docker-firewall.service', 'ExecMainExitTimestampMonotonic')
+        gate_started=timestamp('alfie-boot-gate.service', 'ExecMainStartTimestampMonotonic')
+        assert 0 < firewall_done <= gate_started, 'Firewall must complete before boot gate starts containers'
+        print('PASS bounded crash retries and verified firewall-before-container boot ordering')
+    from sandbox_mounts import restricted_mounts
+    sandbox=next(item for item in inspections if item['Name']=='/alfie-sandbox')
+    mounts=[{'source':m['Source'],'target':m['Destination'],'read_only':not m['RW']}
+            for m in sandbox['Mounts']]
+    assert restricted_mounts(mounts)==mounts, 'Sandbox still exposes personal data or writable code'
+    print('PASS sandbox personal-data mounts removed and code mounts read-only')
     ok=run('alfie',GATEWAY,gateway=True)
     ok=run('alfie-sandbox',SANDBOX) and ok
     # Listener proves worker denial is a filter, not merely absence of a listening service.
@@ -214,7 +254,12 @@ def main():
         if pid.isdigit():
             subprocess.run(['docker','exec','alfie','kill','-TERM',pid],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
         listener.wait(timeout=10)
-    ok=run('alfie',BROWSER,gateway=True,timeout=240) and ok
+    task_policy=subprocess.run(['docker','exec','alfie','test','-f','/opt/hermes/alfie_permissions.py'],capture_output=True).returncode==0
+    if task_policy:
+        ok=run('alfie',Path('/opt/alfie/task-permissions/live_acceptance.py').read_text(),gateway=True) and ok
+        print('STATUS browser interaction disabled by task policy; denied-action checks replace browser form tests')
+    else:
+        ok=run('alfie',BROWSER,gateway=True,timeout=240) and ok
     if args.research: ok=run('alfie',RESEARCH,gateway=True,timeout=350) and ok
     return 0 if ok else 1
 if __name__=='__main__':sys.exit(main())

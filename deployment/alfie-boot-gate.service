@@ -1,0 +1,16 @@
+[Unit]
+Description=Start Alfie only after Docker firewall policy succeeds
+Requires=docker.service alfie-docker-firewall.service
+After=docker.service alfie-docker-firewall.service
+PartOf=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/python3 /opt/alfie/deployment/boot_gate.py start
+ExecStop=/usr/bin/docker stop -t 30 alfie alfie-websearch alfie-sandbox alfie-egress
+TimeoutStartSec=120
+TimeoutStopSec=180
+
+[Install]
+WantedBy=multi-user.target docker.service

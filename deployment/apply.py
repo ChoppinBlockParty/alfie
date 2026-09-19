@@ -5,14 +5,15 @@ import os
 import shutil
 import subprocess
 import yaml
+from sandbox_mounts import restricted_mounts
 
 root=Path('/opt/alfie')
 compose=root/'docker-compose.alfie.yml'
 d=yaml.safe_load(compose.read_text())
 s=d['services']
 gateway=s['gateway']; sandbox=s['sandbox']; worker=s['websearch']; proxy=s['egress']
-# Keep all existing state and unrelated configuration. Only remove Google mounts.
-sandbox['volumes']=[v for v in sandbox.get('volumes',[]) if not any(x in str(v) for x in ('google_token.json','google_client_secret.json'))]
+# Remove personal data from arbitrary execution; preserve the files on the host.
+sandbox['volumes']=restricted_mounts(sandbox.get('volumes', []))
 sandbox['mem_limit']='512m'
 sandbox['memswap_limit']='512m'
 worker.update(mem_limit='1280m',memswap_limit='1280m',pids_limit=256,shm_size='128m',cpus=1.5,
@@ -24,6 +25,9 @@ d['networks']['alfie-egress-public']={'driver':'bridge','ipam':{'config':[{'subn
 proxy['networks'].pop('alfie-egress', None)
 proxy['networks']['alfie-egress-public']={'ipv4_address':'172.31.241.2'}
 mounts=[
+ '/opt/alfie/email-watch/email_watch.py:/opt/data/scripts/email_watch.py:ro',
+ '/opt/alfie/email-watch/email_watch_validation.py:/opt/data/scripts/email_watch_validation.py:ro',
+ '/opt/alfie/email-watch/SKILL.md:/opt/data/skills/personal/email-watch/SKILL.md:ro',
  '/opt/alfie/google-workspace/scripts:/opt/alfie-google/scripts:ro',
  '/opt/alfie/google-workspace/scripts:/opt/data/skills/productivity/google-workspace/scripts:ro',
  '/opt/alfie/google-workspace/gateway-plugin:/opt/data/plugins/google_workspace:ro',
@@ -35,6 +39,12 @@ mounts=[
  '/opt/alfie/web-browser/SKILL.md:/opt/data/skills/personal/public-web-browser/SKILL.md:ro',
 ]
 vol=gateway.setdefault('volumes',[])
+for relative in ('scripts/email_watch.py', 'scripts/email_watch_validation.py',
+                 'skills/personal/email-watch/SKILL.md'):
+    target=root/'data'/relative
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.touch(exist_ok=True)
+    os.chown(target,10000,10000)
 for mount in mounts:
     target=mount.split(':')[1]
     vol[:]=[v for v in vol if not (isinstance(v,str) and v.split(':')[1]==target)]

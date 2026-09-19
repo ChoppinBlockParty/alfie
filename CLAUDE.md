@@ -9,10 +9,20 @@ Each subsystem is a subproject directory (first: `email-watch/`) with its own RE
 
 ## Core Instructions
 
+* Usefulness is a core requirement. Routine conversation and lookups should work from ordinary
+  language, without mode-prefix memorization or repeated permission prompts. Security must bound
+  task effects and data flow, not make the personal assistant unusable. Preserve exact-action
+  approvals for account changes and private/public separation; explain genuine limitations plainly.
 * Be concise and clear. Keep answers short unless asked to be comprehensive.
 * Technical tone. No metaphors, idioms or filler.
 * Ask a follow-up question when something is ambiguous instead of guessing.
 * Separate what you verified by reading code or the box from what you inferred.
+* For deployment/SSH commands, explicitly use `/bin/bash` (with `login: false` when choosing
+  the tool shell). From the repository root, run `source deployment/local-env.sh && ...` and
+  use the loaded, quoted `"$ALFIE_VPS_HOST"`. The authoritative target is in ignored `.env.local`, not
+  `env.local` or the ambient shell environment. Never source this Bash-only loader from zsh:
+  zsh has its own `HOST` parameter, which can point to the local machine. Stop on loader errors.
+  Do not copy the actual SSH alias/address into tracked instructions or scripts.
 * Commit messages: one short line, no body unless asked. Never add `Co-Authored-By`,
   `Claude-Session` or other attribution trailers.
 * Treat this repository as public. Never add real secrets, credentials, API/OAuth tokens,

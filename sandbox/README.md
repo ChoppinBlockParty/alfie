@@ -6,9 +6,15 @@ sandbox cannot initiate connections to gateway, web worker or host services.
 
 ## Files and credentials
 
-Allowed: read-only skill/script trees, read/write shared records and email-watch ledger, and
-Hermes's synced skills/cache. Personal records remain readable by agent commands; this is why
-public browsing has its own worker. Do not claim the sandbox contains no private data.
+Deployed on 2026-09-19: coordinated deployment removes personal-data binds,
+including the shared databases/ledger, and forces mounted gateway skills/scripts read-only.
+Host data is preserved. This disables shell-based records/ledger commands until a restricted
+gateway lookup interface is integrated. The sandbox was recreated and actual mounts verified;
+named host-key storage was preserved. This is not a forensic scan of all historical copied data.
+
+Allowed: read-only skill/script trees and Hermes's synced skills/cache. Shared personal records
+and the email-watch ledger are no longer mounted. Agent commands can still receive private text
+through tool arguments; removing mounts is not complete private/public task isolation.
 
 Google credentials are removed by the coordinated deployment. The gateway plugin owns Google
 operations. The old skill's required_credential_files declarations are removed, gateway

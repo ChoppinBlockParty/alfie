@@ -11,16 +11,16 @@ DEST=/opt/alfie/websearch
 PKI=$DEST/pki
 DATA=/opt/alfie/data
 
-ssh "$HOST" "mkdir -p $DEST/worker"
+ssh "$ALFIE_VPS_HOST" "mkdir -p $DEST/worker"
 scp -q "$DIR/worker/Dockerfile" "$DIR/worker/codex.py" "$DIR/worker/retrieval.py" \
-       "$DIR/worker/research.py" "$DIR/worker/server.py" "$DIR/../web-browser/worker/browser.py" "$HOST:$DEST/worker/"
+       "$DIR/worker/research.py" "$DIR/worker/server.py" "$DIR/../web-browser/worker/browser.py" "$ALFIE_VPS_HOST:$DEST/worker/"
 
 # --- PKI ------------------------------------------------------------------
 # Generated on the box, never in $HERMES_HOME: that tree is the sandbox's sync
 # source and the backup target, and these keys belong to neither. Generated once;
 # re-running never rotates silently, because a silent rotation would break the
 # running gateway's client certificate.
-ssh "$HOST" "set -euo pipefail
+ssh "$ALFIE_VPS_HOST" "set -euo pipefail
   mkdir -p $PKI && chmod 700 $PKI
   cd $PKI
   if [ ! -f ca.crt ]; then
@@ -56,14 +56,14 @@ ssh "$HOST" "set -euo pipefail
   openssl x509 -in client.crt -noout -enddate | sed 's/^/client cert /'"
 
 # --- worker image ---------------------------------------------------------
-ssh "$HOST" "docker build -t alfie-websearch:latest $DEST/worker"
+ssh "$ALFIE_VPS_HOST" "docker build -t alfie-websearch:latest $DEST/worker"
 
 # --- gateway plugin -------------------------------------------------------
-ssh "$HOST" "mkdir -p $DATA/plugins/websearch $DEST/gateway-plugin"
-scp -q "$DIR/gateway-plugin/__init__.py" "$DIR/gateway-plugin/plugin.yaml" \
-       "$HOST:$DATA/plugins/websearch/"
-scp -q "$DIR/gateway-plugin/__init__.py" "$DIR/gateway-plugin/plugin.yaml" "$HOST:$DEST/gateway-plugin/"
-ssh "$HOST" "chown -R 10000:10000 $DATA/plugins/websearch && chmod 644 $DATA/plugins/websearch/* $DEST/gateway-plugin/*"
+ssh "$ALFIE_VPS_HOST" "mkdir -p $DATA/plugins/websearch $DEST/gateway-plugin"
+scp -q "$DIR/gateway-plugin/__init__.py" "$DIR/gateway-plugin/inference_broker.py" "$DIR/gateway-plugin/plugin.yaml" \
+       "$ALFIE_VPS_HOST:$DATA/plugins/websearch/"
+scp -q "$DIR/gateway-plugin/__init__.py" "$DIR/gateway-plugin/inference_broker.py" "$DIR/gateway-plugin/plugin.yaml" "$ALFIE_VPS_HOST:$DEST/gateway-plugin/"
+ssh "$ALFIE_VPS_HOST" "chown -R 10000:10000 $DATA/plugins/websearch && chmod 644 $DATA/plugins/websearch/* $DEST/gateway-plugin/*"
 
 echo
 echo "Deployed. The plugin is loaded at gateway start:"

@@ -1,6 +1,6 @@
 # Alfie — current specification
 
-Spec version: 0.39. Updated: 2026-09-19.
+Spec version: 0.44. Updated: 2026-09-19.
 
 Self-hosted personal AI agent with Telegram, memory, reminders, email and public-web research.
 This document describes the whole system and current decisions. Subsystem READMEs own their
@@ -9,10 +9,55 @@ Public-release cleanup and its remaining history gate are in [publication-plan.m
 
 ## 1. Status
 
-The four-container browser/security build is deployed and verified on the VPS. Interactive
-public browsing and research share one worker; Google operations run in the gateway without
+Highest-priority next release: useful natural-language task routing. The current rule-based
+classifier rejects ordinary owner wording with a generic mode-prefix error. This is a known
+usability defect, not a forum-topic authorization failure. Users must not normally need prefixes.
+Usefulness is a core requirement: routine chat/lookups should work, and confirmations should be
+proportionate to effects. Model intent proposals must not authorize writes or mix private data
+with public research. Current enforcement remains deployed until the replacement is verified.
+
+The four-container browser/security build and initial task permissions are deployed on the VPS.
+Public research uses its worker; interactive browsing is disabled by task policy. Google operations run in the gateway without
 forwarding credentials to the command sandbox. Live acceptance passed on 2026-09-19;
 measurements and test limits are in [deployment/acceptance.md](deployment/acceptance.md).
+
+The security increment is deployed using existing images: Google writes require authenticated
+Telegram buttons, email-watch is report-only, personal database mounts are removed from the
+command sandbox, and filtering updates transactionally. Automated runtime acceptance passed.
+Real owner self-test approval/rejection and an exact-action Drive folder creation were verified.
+The first proposal exposed a dispatcher mismatch; after the deployed fix, the approved immutable
+action succeeded and a read-only search found exactly one matching folder.
+
+Mandatory task grants now gate Telegram entry, cron entry, agent context and tool dispatch.
+Unambiguous email/web read requests receive read-only modes; supported natural-language writes
+require a Telegram task-scope confirmation, then separate exact-action approval. Explicit exact
+operation prefixes remain available. Read tasks cannot propose writes. Every task
+has fresh context: prior conversation, personal memory/context files and background memory
+updates are disabled. Shell, browser interaction, delegation, scheduling and messaging tools
+are unavailable. Media, slash-command and unsupported-source agent tasks fail closed.
+The one active reminder has a reviewed tool-free grant; two completed reminders remain disabled.
+Two hash-checked fixed scripts remain permitted. Schedules and destinations were preserved.
+These restrictions override the broader use-case catalogue below.
+See [task-permissions/README.md](task-permissions/README.md) for modes and limitations.
+Private reads now require a separate exact-selector approval, with bounded returned-ID access
+and no in-task query expansion. Approved exports, safe browser interactions and isolation against
+gateway code compromise remain open. Installed-runtime policy/approval tests passed;
+live read/denial checks passed. The owner received and approved a write-mode folder review;
+the approval database records success with the matching task grant. Remaining owner smoke
+checks and evidence limits are recorded in deployment/acceptance.md.
+See [plan-next](plan-next.md) for remaining work; this is not maximum-security completion.
+
+The natural-language two-review smoke test passed: the owner confirmed scope and rejected the
+exact action; private queue state verifies rejection. Research model credentials now stay in the
+gateway behind a job-bound broker; stalled worker jobs are terminated. Google subprocesses have
+streaming output limits and process-group deadlines. Firewall-first container startup passed a
+real host reboot. An encrypted Drive backup passed read-back and offline data/approval recovery
+checks. Backups remain manual; the recovery private key stays on the owner's Mac, not the VPS.
+Web retrieval now has pre-parse response limits and public-destination preflight. Google write
+reviews include target metadata and, for Sheets replacement, prior values; context is checked
+again before execution. Spreadsheet writes use literal values, not formulas. A read-only operator
+reconciliation helper supports uncertain outcomes without retrying. Difficult full-host recovery
+tests are deferred by owner direction and are not implementation release blockers.
 
 ### Use cases
 
@@ -22,7 +67,7 @@ measurements and test limits are in [deployment/acceptance.md](deployment/accept
 | UC2 | Find an email record and act on it | Gmail search/read and supported Google operations; no private email in the public browser |
 | UC3 | Research a question or product | Research summary with sources; interactive browsing when needed |
 | UC4 | Voice notes and photographs | Local transcription and model vision |
-| UC5 | Correspond by email | Gmail send/reply; existing owner decision permits sending without a new confirmation gate |
+| UC5 | Correspond by email | Gmail send/reply only after exact-action Telegram approval |
 | UC6 | Remember facts, obligations and reminders | Local fact store, records, scheduled reminders |
 | UC7 | Keep preferences and learning | Local memory and USER.md |
 
@@ -30,7 +75,7 @@ measurements and test limits are in [deployment/acceptance.md](deployment/accept
 
 | Directory | Responsibility |
 |---|---|
-| `email-watch/` | Tool-less email classification, records/calendar updates, Telegram reports |
+| `email-watch/` | Tool-less classification, pending/quarantined observations, Telegram reports; no automatic account writes |
 | `google-workspace/` | Fixed Google operations in the trusted gateway; no credential forwarding |
 | `sandbox/` | Shell/file/code execution over SSH in the command container |
 | `web-search/` | Search/read/analyse loop and shared worker server/image |
@@ -61,7 +106,41 @@ measurements and test limits are in [deployment/acceptance.md](deployment/accept
 
 ## 3. Host and runtime
 
-Deployment target and public host addresses are configured in ignored `.env.local`.
+### Local deployment configuration: `.env.local`
+
+The repository-root **`.env.local` is the private source of truth for deployment settings**.
+The leading dot matters: `env.local` is a different filename and is not loaded. Create it from
+the tracked `.env.example`, supply real values privately and set its permissions to `0600`.
+
+| Setting | Purpose |
+|---|---|
+| `ALFIE_VPS_HOST` | SSH destination: an operator-configured SSH alias or address. SSH resolves aliases through the operator's SSH configuration and uses their existing authentication. |
+| `ALFIE_PUBLIC_IPV4`, `ALFIE_PUBLIC_IPV6` | Server public addresses rendered into host-destination deny rules, proxy configuration and acceptance checks. These are not interchangeable with the SSH alias. |
+| `ALFIE_OWNER_TELEGRAM_USER_ID` | Numeric Telegram identity of Alfie's single owner; shared by all owner-only policies. |
+| `EMAIL_WATCH_CHAT_ID`, `EMAIL_WATCH_THREAD_ID` | Private email-watch delivery destination. |
+| `ALFIE_APPROVAL_CHAT_ID`, `ALFIE_APPROVAL_THREAD_ID` | Private dedicated Telegram forum/topic for approval reviews; distinct from email-watch delivery. |
+| `TELEGRAM_BOT_USERNAME` | Operator reference; setting it here does not change the gateway's bot credentials. |
+
+Load it through `deployment/local-env.sh` **in Bash**, from the repository root. For execution
+tools, explicitly select `/bin/bash` with `login: false`. Chain the loader with `&&` so SSH does
+not run if loading fails. For example:
+
+```sh
+/bin/bash -c 'source deployment/local-env.sh && ssh -o BatchMode=yes -o ConnectTimeout=8 "$ALFIE_VPS_HOST" true'
+```
+
+`ALFIE_VPS_HOST` is required; there is no fallback to the old `HOST` variable. Never infer the
+deployment target from a pre-existing shell `HOST`: zsh defines its own HOST
+parameter, which can refer to the local machine. The loader rejects non-Bash shells and exports
+the loaded settings to child deployment scripts. Its loaded marker avoids repeated sourcing
+within that process tree; start a fresh Bash process after changing `.env.local`.
+
+This is trusted shell-format operator input, not an agent-editable settings file. It configures
+deployment tooling; it is **not the agent's runtime `.env`, `config.yaml`, OAuth store or a way
+to change live model/bot settings**. Reading or editing it alone does not deploy anything.
+Do not copy it into containers, server build contexts, tracked documentation or Git. Publish
+only placeholder variable names/examples; keep credentials in the existing private secret store.
+
 Live inventory, provider identifiers, software inventory and resource snapshots belong in
 private operator records. Public deployment layout below is the project's default layout.
 
@@ -76,7 +155,8 @@ changes must preserve these controls.
 | `/opt/alfie/hermes-agent` | Upstream source; gateway image baseline |
 | `/opt/alfie/docker-compose.alfie.yml` | Operational Compose, service keys gateway/sandbox/websearch/egress |
 | `/opt/alfie/data` → `/opt/data` | Gateway HERMES_HOME; credentials, config, memories, cron and databases |
-| `/opt/alfie/data/shared` | records.db and email_watch.db; shared with shell sandbox |
+| `/opt/alfie/data/shared` | records.db and email_watch.db; gateway-only, no shell sandbox mount |
+| `/opt/alfie/data/security` | Private SQLite approval state; never mounted in sandbox |
 | `/opt/alfie/ssh` | Gateway-to-sandbox SSH key; not under HERMES_HOME |
 | `/opt/alfie/websearch/pki` | Worker mutual-TLS CA and certificates; not under HERMES_HOME |
 | `/opt/alfie/google-workspace` | Gateway plugin, fixed Google scripts and skill |
@@ -85,14 +165,15 @@ changes must preserve these controls.
 | `/opt/alfie/backups/four-container-*` | Root-only rollback configuration and image references |
 | `/usr/local/sbin/alfie-docker-firewall.sh` | Persisted host/bridge firewall |
 
-The command sandbox can read skill/script trees and modify shared records. It must not receive
+The command sandbox can read immutable skill/script trees but cannot access the shared records mount. It must not receive
 `.env`, `auth.json`, Google tokens/client secrets, gateway databases, host files, vaults or
 Docker sockets. Google script dependencies live in the gateway. Skills carry no Google
 `required_credential_files` declarations; the credential guard also refuses registration.
 
 The public worker receives neither HERMES_HOME nor records. It holds its own TLS server key;
-this is a service identity, not an external account credential. The gateway sends an OpenAI
-access token per research request, never its refresh token. Browser actions need no model token.
+this is a service identity, not an external account credential. OpenAI access and refresh tokens
+stay in the gateway; a fixed, bounded broker serves job-bound inference over the existing mutual-TLS
+connection. Browser actions need no model token and remain disabled by task policy.
 
 ## 4. Capabilities
 
@@ -111,12 +192,22 @@ OAuth re-authorization is operator-managed. No token values in logs or validatio
 The gateway tool `google_workspace` exposes fixed Gmail, Calendar, Drive, Contacts, Sheets
 and Docs operations. No arbitrary shell, URL proxy, local-file upload/download or credentials
 operation. Granted OAuth scopes remain unchanged by this deployment; Drive was narrowed to
-`drive.file`. A plugin changes token exposure, not the power of permitted send/modify actions.
+`drive.file`; the live scope metadata was verified, and missing metadata fails closed.
+Reads execute directly. Writes from the configured owner Telegram task receive a full JSON review;
+only its authenticated button callback can execute the immutable action once. Replies freeze the
+actual recipient/thread/headers before review. Reviews expire after 24 hours or restart. A timeout
+or interruption after execution starts is unknown and must not be automatically retried.
+Private approval policy uses `ALFIE_OWNER_TELEGRAM_USER_ID` for the sole owner plus the dedicated
+`ALFIE_APPROVAL_CHAT_ID` and `ALFIE_APPROVAL_THREAD_ID` in `.env.local`. Owner requests may
+originate in any topic of that forum; reviews and callbacks are restricted to the approval topic.
+Runtime context, not model arguments, supplies identity.
 
 `email-watch` runs every 30 minutes as an existing `no_agent` cron job. It reads each new email
-once, calls a tool-less model, and applies structured records/calendar/timezone updates. Its
-implementation and budgets are in `email-watch/README.md`. Preserve its current local edits
-and live schedule. Do not redeploy unrelated changes as part of the browser cutover.
+once, calls a tool-less model, validates complete bounded results and stores pending/quarantined
+observations. It cannot update Calendar, personal records or timezone. Its implementation and
+budgets are in `email-watch/README.md`; the existing schedule/destination were preserved.
+Direct observation-to-record promotion is not yet implemented. The owner can separately request
+and approve a supported Google action. Shell-based records lookups are unavailable.
 
 The live gateway Google labels read succeeded at acceptance. Existing email-watch remains a
 configured `no_agent` job. No mail, calendar write, Telegram message or purchase was sent by tests.
@@ -124,8 +215,9 @@ configured `no_agent` job. No mail, calendar write, Telegram message or purchase
 ### Research and interactive browsing
 
 `research(question, depth)` returns a bounded summary with sources. It calls Tavily/Firecrawl
-through egress and keeps bulk page content out of the gateway context. The worker uses a
-per-request OpenAI access token and mutual TLS. See `web-search/README.md` for budgets.
+through egress and keeps bulk page content out of the orchestrator's context. The worker sends
+bounded inference requests through the gateway broker without receiving model credentials.
+The gateway broker/provider necessarily processes those inputs. See `web-search/README.md`.
 
 `browse` provides open, snapshot, click, fill, select, scroll, back and close. It runs Chromium
 in the same worker, with the Chromium sandbox enabled, read-only rootfs and bounded temporary
@@ -147,8 +239,10 @@ mounted as directories so database and -wal/-shm files refer to the same storage
 
 Voice transcription uses faster-whisper `base`, installed via gateway lazy dependencies.
 Keep the venv PATH patch at `/etc/profile.d/99-hermes-venv.sh`; verify actual execution paths.
-Reminders use Hermes cron; `email-watch` and quota alerts are scripts. Host timers provide
-backup and record expiry on privately configured schedules. Off-box backup remains deferred.
+Reminders use Hermes cron; `email-watch` and quota alerts are scripts. Existing expiry operations
+remain operator-managed. Encrypted off-host backups use the pinned Drive backup folder manually,
+with no recurring backup timer or automatic deletion. See `backup/README.md` for coverage,
+offline recovery, key custody and limitations; this is not a complete host/image backup.
 All cron deliveries use `cron.wrap_response: false`: send the job's content without the
 automatic job-name/ID header, separator or management footer. Email reports use bold digest
 and numbered email titles, unindented details and an explicit Open email link.
@@ -163,10 +257,9 @@ and numbered email titles, unindented details and an explicit Open email link.
 - Public browsing necessarily permits arbitrary public destinations. It can disclose anything
   sent to that worker. Do not claim destination allowlisting prevents public-worker exfiltration.
 - Research and browser share one compromise boundary; a browser escape into the worker could
-  expose the worker TLS identity or model access-token copies. No refresh token is there.
+  expose its TLS identity and public task contents, but no model access/refresh token is there.
 - Read-only rootfs, no swap for worker, bounded tmpfs and disabled core dumps reduce persistence.
-  Python token memory erasure remains best effort. Access tokens are not assumed short-lived;
-  the previous measured lifetime was 10 days.
+  Provider credentials remain sensitive long-lived authority inside the trusted gateway.
 - Google/Telegram tools can perform permitted account actions without revealing token bytes.
   Prompt injection can still misuse those actions or disclose content through the gateway.
 - Native plugins, cron scripts and integration code run in the trusted gateway. Tool allowlists
@@ -194,14 +287,28 @@ and numbered email titles, unindented details and an explicit Open email link.
 
 ## 7. Remaining work
 
+- P0: replace brittle intent recognition and generic prefix errors with validated, tool-free
+  natural-language proposals and specific clarifications. Reduce unnecessary permission friction;
+  preserve task isolation and exact-action write approval. See the P0 plan before other enhancements.
+- Extend the deployed [task permissions contract](deployment/task-permissions.md): classify
+  every source before execution; bind readable data, permitted actions/destinations and durable
+  state changes independently. Email search cannot propose sends; public research cannot write
+  personal memory or accounts. Service/operation and owner-reviewed selector/result-ID enforcement
+  are deployed. Reviewed private exports remain unavailable.
+- Decide whether to retain or separately approve deletion of the synthetic Drive test folder.
+- Enforce private/public task modes across all tools; audit alternate gateway write/memory/scheduling
+  paths, enrich resource reviews, and add restricted personal-record lookup/promotion.
+- Extend provider-specific outcome reconciliation and atomic write preconditions where supported.
+  Full replacement-host recovery tests are deferred, not claimed complete. Expanded cron fingerprints, Google subprocess limits and
+  credential-free research are deployed. Confirmations do not isolate gateway compromise.
 - LLM commands in the shell sandbox need a separate access-token delivery implementation;
   no model credential is provisioned there by this build.
 - Browser compatibility varies; CAPTCHA, popup-only flows and authenticated checkout are outside scope.
 - Track Chromium security updates and rebuild the pinned worker promptly; do not leave a browser
   image indefinitely on its initial version.
-- Research result caching, media-cache expiry, tool-schema/token reductions and off-box backups remain deferred.
+- Research result caching and media-cache expiry remain deferred. Off-host backups remain manual.
 - Review undocumented vaults, rotate previously exposed personal credentials if outstanding,
   decide whether to retain the unused paid API key, and review external firewall coverage.
 - Certificate expiry is tracked privately; rotation is operator-managed and must update both ends.
-- Verify firewall restoration after a scheduled host reboot; persistence is configured and enabled,
-  but this deployment did not reboot the VPS.
+- Maintain firewall-first boot gating and re-test after network/runtime changes. A real VPS reboot
+  and continuous denied probes during transactional firewall replacement passed.

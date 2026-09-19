@@ -1,67 +1,180 @@
 # Deployment acceptance — 2026-09-19
 
-Status: deployed and verified on the privately configured deployment target. Four running containers: alfie, alfie-sandbox,
-alfie-websearch and alfie-egress. Browser code is part of the shared worker image; no fifth container.
-Images were built locally; subsystem Dockerfiles use official Debian 13. Hermes source remains
-revision `77915e344cb0cd8e20661d4a7b393f987a2eef32`.
+## Latest verified increments
 
-## Verified
+Current usability defect: the owner reports ordinary forum requests receiving the generic
+mode-prefix error. This is a classifier limitation, not evidence of forum-topic denial.
+Natural-language intent and useful clarifications are P0. A passing security test does not prove
+the assistant is usable; ordinary paraphrases must be part of the next release's acceptance.
 
-- 36 local tests passed: browser 9, Google argument validation 3, research 24. `git diff --check` passed.
-- Chromium launched in an offline container with its own sandbox enabled, deployed seccomp,
-  all capabilities dropped, no-new-privileges, read-only rootfs and bounded memory/tmpfs.
-- Gateway discovers browse, research and google_workspace. Native gateway browser/web toolsets
-  are disabled. The real Hermes code execution environment is SSH, and credential files are absent
-  there. Read guards reject .env/auth.json/Google credential filenames; credential registration and
-  all credential forwarding are refused. No container has Docker socket access or privileged mode.
-- Google labels read succeeds. Existing email-watch remains configured as `no_agent`. Its unrelated
-  local code edits were preserved and not deployed. These checks do not claim a complete cron run.
-- Public browser open/snapshot/click/back/fill/close succeeded using example.com, Books to Scrape
-  and the httpbin demonstration form. The form was not submitted. A foreign session cannot close
-  the owner's browser; research returns busy during that session.
-- Metadata URL and public-to-metadata redirect refused. Proxy rejects loopback, metadata, gateway,
-  VPS public IP and a hostname resolving to loopback. Direct worker traffic to gateway, sandbox,
-  host and internet is denied; the gateway test used a live temporary listener on port 18888.
-- Sandbox proxy rejects general web, Google and metadata requests, while CONNECT to chatgpt.com:443
-  succeeds without a token. Direct sandbox traffic to worker, host and public internet is denied.
-- Worker refuses a caller without a mutual-TLS certificate, with explicit server CA verification.
-  Gateway browser and research calls authenticate successfully with their client certificate.
-- End-to-end research succeeded after the redirect fix; returned 1369 characters for the public
-  example.com/IANA question. No private content or credential values were printed.
-- Browser close terminates Chromium; only the Python worker remained. Resource limits and
-  read-only worker rootfs are active. Firewall service is enabled and bridge filtering is 1.
+- Exact-selector private reads, target-context write reviews and bounded retrieval are deployed
+  using the existing images/containers. Installed-runtime suites: 47 Google tests, 18 permission
+  tests and 34 research tests pass. Coverage includes changed-query/unreturned-ID denial, rejected
+  read scopes, cache/budgets, changed target context, nested values/addresses, literal Sheets
+  writes, escaped Drive queries, response streaming limits and non-public destinations.
+  Source inspection confirms owner/message binding and metadata checks; the new private-read
+  button flow has not yet been exercised by the owner. No Google writes were made for acceptance.
+  Post-cutover Google operator health read, unreviewed-private-read denial, network controls and
+  public research passed. Existing cron grants are retained with the reviewed CLI dependency
+  fingerprint updated. Difficult full-host recovery tests remain deferred, not a release blocker.
+  Retrieval's initial direct-DNS preflight failed closed on this restricted worker and discarded
+  valid results. The corrected implementation uses bounded fixed-endpoint HTTPS DNS over the
+  existing proxy, with no direct DNS allowance. Installed-worker checks passed; a public probe
+  returned three valid results and extracted a nonempty page. Remote scraper DNS/redirects remain
+  a provider dependency. Rollback backups now include worker runtime overlays.
+  The final full deployment verifier passed after the DNS correction and updating the obsolete
+  unreviewed-read assertion. The new owner read-button interaction remains unobserved; runtime
+  callback/identity tests are evidence of implementation behavior, not a claimed owner click.
+- Expanded cron execution fingerprints deployed with private policy migration. All 18 permission/
+  migration tests passed locally and in the installed runtime. Mocked live-policy checks verified
+  all five definitions, three unchanged grants, two disabled jobs and rejection of added schedule,
+  context, monitor, base-URL and session-attachment inputs. No jobs were executed for acceptance.
+- Natural-language scope confirmation deployed. Owner confirmed both Telegram reviews appeared;
+  the exact-action queue records rejection for the synthetic folder test. No Google mutation
+  resulted. Scope cancellation/expiry/replay and wrong identity/message cases have automated tests.
+- Research inference broker deployed with existing images/containers: no access token reaches
+  the public worker. Job-bound fixed inference, streaming limits and killable research subprocesses
+  passed 31 installed-worker tests and live end-to-end research acceptance.
+- Google execution limits deployed: combined stdout/stderr capped at 256 KiB during reads,
+  60-second process-group deadline, no automatic write retry. All 35 tests pass in the installed
+  gateway runtime, including oversized output and a descendant holding the output pipe open.
+- Firewall-first boot gating installed. Docker policies are `on-failure:5`; systemd starts the
+  four containers only after the firewall unit. Real VPS reboot and full read-only/runtime
+  acceptance passed. Continuous probes during transactional replacement: 50 attempts, zero
+  connections. This sample is not a formal proof of zero update gaps.
+- Encrypted off-host Drive backup uploaded, downloaded and checksum-verified. Offline Mac
+  recovery authenticated/decrypted and checked 26 selected artifacts and 14 SQLite databases;
+  synthetic pending/executing approvals became expired/unknown. No restored service was started.
+  Recovery key stays on the Mac; backups are manual with no automatic deletion by owner choice.
+  This is a data recovery rehearsal, not a complete replacement-host/image restore. The snapshot
+  predates later boot/task/broker updates; apply current security code before enabling writers.
+
+## Task permissions
+
+Schema-exposure follow-up: deployed the schema-only `model_tools.py` overlay update after
+verifying installed hashes and taking a backup. The gateway was stopped before replacing its
+mounted source and recreated using the existing image. Direct connector schemas replace deferred
+discovery; helper permissions were not broadened. All task modes passed installed-runtime schema
+checks before and after activation, including repeated cached lookups. Post-cutover live Gmail
+read and prohibited-effect checks passed. Local suites: 11 permission tests pass; 30 Google tests
+run with two installed-runtime-only tests skipped locally. No external writes were made for this
+follow-up. Subsequent owner Telegram tests passed: research called `research` directly and
+returned a final answer mentioning IANA; the folder proposal called `google_workspace` directly
+and its bound review was rejected. Neither fresh task attempted discovery helpers.
+
+Cron review: only one of the three previously blocked agent jobs was active; two were completed
+and disabled. The active future reminder now has a frozen tool-free `chat` grant. No schedule or
+destination changed, no reminder was executed for testing, and completed jobs were not enabled.
+An actual-policy mocked runner verified no Google, research, browser, shell, memory, messaging
+or cron tools, rejection of a changed prompt and context cleanup. Fourteen local permission/
+reminder tests passed. The two fixed-script grants are unchanged.
+
+Backup verification: the latest private rollback backup passed readability, ten overlay digest/
+syntax checks and three SQLite integrity checks. The separate encrypted off-host backup and
+offline recovery evidence are above and in [backup/README.md](../backup/README.md).
+
+Initial task enforcement is deployed through ten pinned-source read-only overlays plus a
+read-only policy module and private cron policy. Existing images, four containers and memory
+ceilings are unchanged. Backups were created before activation; subsequent offline data recovery
+was exercised as described above.
+
+- Installed runtime: all 10 permission tests and 30 Google/approval tests pass; external writes
+  mocked. Overlay hashes, compilation, actual registry checks and agent initialization passed.
+- Live: Gmail labels read succeeds with email-read; email-read/web-read deny sending, memory,
+  cron, shell, browser fill/click. Web-read cannot read Gmail; no grant cannot read Gmail.
+- Full post-cutover deployment verification passed, including sandbox/worker network denials,
+  credential guards, report-only email-watch and end-to-end public research with a web-read grant.
+  Browser form tests were replaced by denied-action checks because interaction is disabled.
+- Approval handler wired without factory failure. Gateway used approximately 219 MiB after
+  startup (an observation, not a peak-load benchmark).
+- Two reviewed fixed cron scripts and one tool-free reminder remain permitted; two completed
+  reminders remain disabled. Browser interaction and history/memory injection are disabled.
+- Owner Telegram write-mode acceptance passed: the owner reported receiving the exact folder
+  review and approving it. Read-only inspection of the approval database confirmed `succeeded`,
+  a bound review message and matching `drive.create-folder` task grant. Remote Drive read-back
+  was not repeated for this new test. Owner rejection/public-mode checks subsequently passed;
+  earlier interactive browser acceptance does not mean current tasks can use the browser.
+- Repeatable owner/operator checks are in [task-permissions/SMOKE-TESTS.md](../task-permissions/SMOKE-TESTS.md).
+
+## Previous security cutover evidence
+
+Status: security increment deployed; real owner self-test approval/rejection and an exact-action
+Drive folder creation are verified. The folder action is recorded succeeded with a valid digest
+and bound review message; a read-only Drive search found exactly one matching folder. Four
+containers remain. Existing images and memory ceilings were retained;
+no build, extra daemon or container was added. Hermes revision:
+`77915e344cb0cd8e20661d4a7b393f987a2eef32`. Installed Telegram adapter, session-context and
+plugin-SDK fingerprints match the inspected pinned source.
+
+## Verified this cutover
+
+- Local suites: Google/approvals 27 (25 pass, two real-Hermes tests skipped locally), deployment
+  15, email-watch 30, browser 9, research 24. All 27 Google/approval tests subsequently pass
+  inside the installed runtime, including real Hermes ContextVars/SDK and Telegram dependencies.
+  External writes were mocked. Diff and sensitive-information scans pass.
+- Running gateway log confirms the native Telegram handler was wired without a factory failure.
+  Private policy and approval database initialize. Configured owner matches the runtime allowlist;
+  no wildcard or allow-all flag was found in the inspected environment. This is not an exhaustive
+  alternate-authentication-path audit.
+- A dedicated approval forum topic was deployed separately from email-watch delivery. A live
+  synthetic ContextVar check confirms that the authenticated owner may propose from another topic
+  in the same forum, while the stored callback authority points to the approval topic. The gateway
+  was restarted, the handler rewired successfully and a real-registry Google read still passes.
+- Tests cover wrong sender/chat/topic/message, bot sender, revoked auth, forgery, content tampering,
+  duplicate/concurrent confirmation, reject, expiry, legacy queue rejection, restart invalidation,
+  failed delivery, execution failure/timeout, no environment identity fallback and callback
+  propagation stopping. Gmail reply targets/headers freeze before review; header injection fails.
+- Gateway discovers Google, browser and research tools. Forged approval flags do not execute
+  mutations. Google labels read succeeds. Live scope metadata includes drive.file, not full Drive;
+  grants were not changed and no re-authorization was performed.
+- Email-watch remains no_agent at its existing schedule/destination. Report-only code is installed;
+  timezone updates are disabled and owner context is unchanged by the tested update function.
+  A complete new-mail classification/delivery run was not forced.
+- Actual sandbox personal-data mounts are removed; code mounts are read-only. Sandbox was
+  recreated, preserving named host-key storage. Real Hermes execution uses SSH; credential files
+  are absent through that path. Read/sync guards reject Google credentials, auth.json and .env.
+  No privileged containers or Docker socket mounts were found.
+- Transactional firewall installation succeeded. Sandbox/worker direct traffic to private, host
+  and public targets is blocked. Proxy rejects loopback, metadata, gateway, host public address
+  and a hostname resolving to loopback. Sandbox model-endpoint CONNECT remains available;
+  general-web/Google/metadata requests are denied. Worker public HTTPS succeeds.
+- Worker refuses callers without an mTLS certificate. Browser open/snapshot/click/back/fill/close
+  succeed on public fixtures; no form submission. Foreign session closure and metadata redirects
+  are refused. Research is refused while a browser owns the worker, then succeeds end-to-end
+  on the public example.com/IANA fixture (1160 returned characters).
+- Firewall persistence service is enabled; inspected sandbox networks have IPv6 disabled.
+  Root-only configuration/image rollback references and online shared/security SQLite snapshots
+  were created before replacement. No database deletion or image/cache pruning was performed.
 
 ## Resource samples
 
-Host: 2 vCPU, 3814 MiB RAM, 2047 MiB swap. After verification: 2621 MiB available RAM,
-110 MiB swap used, 12 GiB free on the 38 GiB root filesystem.
+Point-in-time Docker samples, not comparable warm-load benchmarks or peak measurements.
+The post-cutover gateway has recently restarted.
 
-`measure.py`, same public example.com session, Docker memory usage:
-
-| Container | Browser open | Browser closed | RAM ceiling |
+| Container | Before cutover | After acceptance | RAM ceiling |
 |---|---:|---:|---:|
-| Gateway | 570.4 MiB | 552.5 MiB | 1024 MiB |
-| Sandbox | 16.84 MiB | 16.84 MiB | 512 MiB |
-| Research/browser | 288.9 MiB | 136.4 MiB | 1280 MiB |
-| Squid | 11.99 MiB | 11.99 MiB | 128 MiB |
+| Gateway | 587.9 MiB | 208.9 MiB | 1024 MiB |
+| Sandbox | 16.84 MiB | 4.14 MiB | 512 MiB |
+| Research/browser | 136.3 MiB | 144.3 MiB | 1280 MiB |
+| Proxy | 11.74 MiB | 11.74 MiB | 128 MiB |
 
-These are point samples, not peaks or worst-case sizing. Worker memory fell by 152.5 MiB after
-close. Sandbox and worker cannot use swap. One research job or one browser session is allowed.
+## Owner acceptance and remaining limits
 
-## Limits and deferred verification
+The owner completed both `/alfie_approval_test` outcomes; neither calls Google. The subsequent
+folder proposal exposed a tool-dispatch signature mismatch before any approval was created.
+Previous tests verified helper calls/registration but missed the real argument-envelope contract.
+A dispatcher adapter and malformed-envelope regressions were added; the installed Hermes registry
+now dispatches the synthetic folder proposal successfully with external writes mocked.
+Google/approval coverage is now 29 tests, with two runtime-only checks skipped locally.
+A synthetic Drive-folder mutation was subsequently approved and verified end to end.
+No real Google mutation, Telegram message, email or purchase was sent by these automated tests.
 
-No host reboot or disaster-recovery restore was performed. Persistence configuration and enabled
-firewall service were checked. Idle/lifetime/action expiry has unit coverage; long-duration browser
-soak and large-site peak-memory tests were not performed. Public fixtures do not guarantee every
-webshop works. Authentication, CAPTCHA, popup-only flows, payment and completed purchases remain
-outside scope. No email, Telegram message, calendar write or purchase was sent during acceptance.
+Deferred: full replacement-host recovery. Not completed: historical sandbox-cache forensic audit,
+provider-specific proof of uncertain outcomes, atomic provider write preconditions and
+restricted personal-record lookup/promotion. Shell, browser interaction, native memory/scheduling
+and other privileged tools are denied by task policy; restoring them requires dedicated controls.
 
-Browser and research share a compromise boundary: a compromised worker could access its TLS key
-and any in-flight model access token. Public egress can disclose any input sent there. No Google,
-Telegram, refresh token or personal-record mount is supplied to the worker. Page text and research
-summaries remain untrusted. Input-field heuristics do not guarantee prevention of disguised
-payment/login actions. The command sandbox still reads shared personal records and approved
-model traffic can transmit them; this build provisions no model token to shell commands.
-
-Rollback images/configuration were retained. Unused build cache was pruned during deployment;
-current/tagged images, volumes and personal data were preserved. See [operations](README.md).
+Confirmations protect the exposed Google tool path, not gateway process compromise. Gateway
+arbitrary code compromise bypasses in-process policy. Research/browser share one compromise boundary,
+including the worker TLS key but no model token. Neither a container nor these approval
+checks make prompt injection impossible. See [the active plan](../plan-next.md).

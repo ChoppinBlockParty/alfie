@@ -14,13 +14,13 @@ SCHEDULE = "every 30m"
 existing = [j for j in list_jobs(include_disabled=True) if j.get("name") == NAME]
 if '--origin-stdin' in sys.argv:
     values = json.load(sys.stdin)
-    for name in ('EMAIL_WATCH_CHAT_ID', 'EMAIL_WATCH_THREAD_ID', 'EMAIL_WATCH_USER_ID'):
+    for name in ('EMAIL_WATCH_CHAT_ID', 'EMAIL_WATCH_THREAD_ID', 'ALFIE_OWNER_TELEGRAM_USER_ID'):
         pattern = r'-?[0-9]+' if name == 'EMAIL_WATCH_CHAT_ID' else r'[0-9]+'
         if not re.fullmatch(pattern, values.get(name, '')):
             raise SystemExit('Missing or invalid ' + name)
     ORIGIN = {'platform': 'telegram', 'chat_id': values['EMAIL_WATCH_CHAT_ID'],
               'thread_id': values['EMAIL_WATCH_THREAD_ID'],
-              'user_id': values['EMAIL_WATCH_USER_ID'], 'scope_id': None}
+              'user_id': values['ALFIE_OWNER_TELEGRAM_USER_ID'], 'scope_id': None}
 elif existing and existing[0].get('origin'):
     ORIGIN = existing[0]['origin']
 else:

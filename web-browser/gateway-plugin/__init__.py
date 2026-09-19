@@ -31,6 +31,11 @@ async def dispatch(arguments):
 
 
 def browse(action='', session_id='', url='', ref='', value='', direction='down', **_):
+    from alfie_permissions import authorize, Denied
+    try:
+        authorize('browse', {'action': action})
+    except Denied as exc:
+        return json.dumps({'error': str(exc)})
     try:
         return asyncio.run(dispatch(dict(action=action, session_id=session_id, url=url,
                                         ref=ref, value=value, direction=direction)))

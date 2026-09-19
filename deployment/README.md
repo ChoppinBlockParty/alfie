@@ -1,11 +1,22 @@
 # Four-container deployment
 
-This subsystem coordinates the VPS selected by `HOST` in ignored `.env.local`. It is not a fresh-host
+This subsystem coordinates the VPS selected by `ALFIE_VPS_HOST` in ignored `.env.local`. It is not a fresh-host
 installer: Docker, Hermes, Compose, gateway credentials, SSH keys and existing volumes must
 already exist. Current topology is in [main-spec](../main-spec.md); verified results are in
 [acceptance](acceptance.md).
 
 ## Build and activate
+
+The four-container security increment is deployed and automated acceptance passed. Telegram
+Google approvals use the existing poller; real owner clicks remain the acceptance gate.
+Email-derived Calendar/records/timezone changes are disabled. Task-scoped private/public isolation
+and the broader security contract remain open; see [integration requirements](telegram-approvals.md).
+
+For this existing-image increment, `bash deployment/deploy-security.sh` backs up configuration
+and live SQLite consistently, stops the gateway before replacing mounted code, stages approvals
+and report-only email code, recreates the sandbox, applies filtering and starts the gateway.
+It adds no image build or service. Failures leave the gateway stopped for inspection rather
+than automatically restarting mixed code. The full rebuild procedure below remains available.
 
 From the repository root:
 
@@ -13,13 +24,15 @@ From the repository root:
 python3 -m unittest discover -s web-browser -p 'test_*.py'
 python3 -m unittest discover -s google-workspace -p 'test_*.py'
 python3 -m unittest discover -s web-search -p 'test_*.py'
+python3 -m unittest discover -s email-watch -p 'test_*.py'
+python3 -m unittest discover -s deployment -p 'test_*.py'
 git diff --check
 ./deployment/deploy.sh
 ```
 
 Copy `.env.example` to `.env.local`, fill in the target and addresses, and run `chmod 600 .env.local`.
-The sanitized local file contains non-address placeholders; supply the actual host addresses
-privately before deployment so the host-destination deny rules are correctly generated.
+Supply actual host addresses privately so host-destination deny rules are correctly generated.
+The current private .env.local was reconciled against live interface addresses during cutover.
 All deploy scripts load this trusted shell-format file and export its settings to child scripts.
 The root deploy script validates public addresses before contacting the host. `render.py` substitutes
 validated addresses into firewall, proxy and verification templates during transfer; never install
@@ -28,9 +41,13 @@ to the server or included in build contexts. The script runs these steps in orde
 
 1. `prepare.py` creates a root-only timestamped backup, copies operational configuration and
    existing managed plugin/skill/guard files, and tags the four running images for rollback.
-   It records the path in `/opt/alfie/deployment/last-backup`. This is a configuration backup,
-   not a backup of live databases or personal data.
+   It records the path in `/opt/alfie/deployment/last-backup`. Shared/security SQLite databases
+   are snapshotted using the online backup API, including committed WAL data. This is not a
+   complete off-box backup. Restores must invalidate approvals and reconcile unknown actions.
 2. Subsystem deploy scripts stage code and build sandbox, Squid and shared worker images locally.
+   email-watch/stage.sh stages report-only code without changing the existing cron registration;
+   apply.py mounts its script, validator and skill read-only. Sandbox personal-data mounts are
+   removed while host databases remain intact.
    Dockerfiles use official `debian:13`; the existing gateway remains built from Hermes source.
    No unofficial prebuilt application image is used. Dependencies are pinned where stated in
    the worker Dockerfile; Debian package updates are resolved during rebuilds.
@@ -50,11 +67,24 @@ monitor disk space before another build.
 
 For independent verification and memory samples:
 
-```sh
+Start `/bin/bash` first if your terminal uses zsh. The loader requires Bash and now rejects
+other shells. In zsh, `HOST` is a shell parameter and is not evidence of the deployment target.
+The target comes from the repository's ignored `.env.local` (with the leading dot). When using
+an execution tool, select `/bin/bash` with `login: false` explicitly. Stop if loading fails.
+
+```bash
+set -e
 source deployment/local-env.sh
-ssh "$HOST" 'python3 /opt/alfie/deployment/verify.py --research'
-scp deployment/measure.py "$HOST":/opt/alfie/deployment/
-ssh ${HOST} 'python3 /opt/alfie/deployment/measure.py'
+ssh "$ALFIE_VPS_HOST" 'python3 /opt/alfie/deployment/verify.py --research'
+scp deployment/measure.py "$ALFIE_VPS_HOST":/opt/alfie/deployment/
+ssh "$ALFIE_VPS_HOST" 'python3 /opt/alfie/deployment/measure.py'
+```
+
+For a connection check from the repository root, this explicitly selects Bash even when
+the surrounding terminal uses zsh:
+
+```sh
+/bin/bash -c 'source deployment/local-env.sh && ssh -o BatchMode=yes -o ConnectTimeout=8 "$ALFIE_VPS_HOST" true'
 ```
 
 Fixtures are public pages. Tests never submit the demo form or send account messages. Research
@@ -62,15 +92,37 @@ consumes model quota. Fixture outages can fail acceptance without indicating a s
 
 ## Firewall and runtime
 
+The read-scope/retrieval increment is activated by `activate_read_scopes.py`, with staged files
+under its documented private host staging root. It validates existing live source, backs up,
+stops affected containers before copying read-only mounted code, updates only the reviewed CLI
+dependency hash in cron policy, and recreates existing images. Its worker-only `--retrieval-dns`
+follow-up supports the initial direct-DNS-to-HTTPS-DNS correction. Both cutovers use a temporary
+startup guard; if a cutover fails, inspect before removing that guard or restarting services.
+Do not run generic staging scripts against active code mounts. `prepare.py` includes worker
+runtime overlays as well as gateway plugins in subsequent rollback backups.
+
 `firewall.sh` installs `ALFIE-FORWARD` in Docker's `DOCKER-USER` chain and `ALFIE-HOST` in INPUT.
+The prepared update uses a validated `iptables-restore --noflush` transaction. It preserves
+unrelated chains and keeps the active rules until COMMIT. Worker source restrictions precede
+the general established-connection allowance; only replies to gateway SSH/TLS and proxy traffic
+are allowed. `--print` on a rendered script emits the transaction without modifying the host.
+Local generation and actual Linux restore/traffic tests passed. Continuous firewall-update probes
+(50 denied attempts), a real host reboot and offline encrypted data recovery also passed;
+full replacement-host/image recovery remains outstanding.
 Workers may initiate only to proxy port 3128. Proxy outbound traffic is public TCP 80/443 only;
 private/reserved destinations and the VPS public address are denied independently of Squid.
 Docker's embedded resolver supplies DNS; this is not a DNS exfiltration-proof boundary.
 Gateway retains trusted network access for Telegram, Google and inference.
 
 The script persists br_netfilter and bridge filtering, and the existing
-`alfie-docker-firewall.service` is enabled. Re-run the firewall after network changes. No reboot
-was performed during acceptance. Do not flush unrelated firewall chains or expose service ports.
+`alfie-docker-firewall.service` is enabled. Re-run the firewall after network changes.
+`alfie-boot-gate.service` starts containers only after the firewall. `boot_gate.py` changes the
+four containers to `on-failure:5`, which does not independently start them after Docker daemon
+restart ([Docker restart policies](https://docs.docker.com/engine/containers/start-containers-automatically/)).
+The gate checks policy/overlay mounts and refuses startup when the private maintenance lock is
+present. `verify.py` checks unit ordering and policies. Reboot acceptance passed. Do not flush
+unrelated firewall chains or expose service ports. The lock is a startup guard, not a stop command
+or protection against an operator directly invoking Docker.
 
 Chromium requires the additional clone/unshare/setns/chroot seccomp allowances documented in
 `web-browser/README.md`. All worker capabilities remain dropped; Chromium sandbox stays enabled.
@@ -102,14 +154,21 @@ For image-only rollback, select a saved image tag from the chosen root-only back
 `images.json`, set that service's Compose `image` to the tag and recreate it. Match plugin code
 to the saved image protocol. Verify again. Do not prune rollback tags.
 
-A full pre-cutover restore also restores the old Google credential exposure. Use only when
-that regression is explicitly intended: stop gateway and worker, restore the backup's Compose,
-config and archived plugin/skill files to their original paths, map service images to
-`images.json`, and reconcile the saved firewall with the restored network addresses before
-recreating services. The new dedicated ALFIE chains must not be blindly left attached to a
-different network layout or flushed without replacement filtering. Backups from before this
-build do not contain the newly created plugin directories. Review restored plugin discovery.
+A full pre-cutover restore can restore old Google credential exposure and remove task checks.
+Do not activate it as a security rollback. Restore into an isolated rehearsal environment first;
+preserve current denied writes, credential separation and firewall restrictions. If compatible
+recovery is unavailable, keep the affected feature disabled. Verify restored plugin discovery,
+task overlays, private policy, network layout and image compatibility before starting services.
+Never leave firewall chains attached to an incompatible network layout or flush them without
+replacement filtering. Invalidate restored approvals and reconcile unknown external actions.
 Never use `terminal.backend: local` as a rollback.
+
+`python3 /opt/alfie/deployment/verify_backup.py --latest` checks private rollback artifact
+readability, overlay digests/syntax and SQLite integrity without restoring or uploading anything.
+It does not establish a complete backup or prove recoverability after host loss. The separate
+[backup subsystem](../backup/README.md) provides manually triggered encrypted Drive backups,
+Mac-only recovery-key custody and an accepted offline data recovery rehearsal. A brief outage
+was owner-authorized with advance notice; keep giving notice before disruptive operations.
 
 Find backup locations in private operator records. Backups include managed
 Google/browser/research plugin paths and both credential guards for repeat deployments.

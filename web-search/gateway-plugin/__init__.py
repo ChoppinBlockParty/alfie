@@ -10,6 +10,8 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import importlib.util
+from pathlib import Path
 import os
 import ssl
 import time
@@ -83,9 +85,12 @@ async def _ask_worker(question: str, depth: str, token: str) -> str:
     import websockets
 
     job_id = uuid.uuid4().hex
+    spec = importlib.util.spec_from_file_location('alfie_research_broker', Path(__file__).with_name('inference_broker.py'))
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    broker = module.Broker(token, job_id, depth)
     frame = json.dumps({"type": "ask", "id": job_id, "question": question,
-                        "depth": depth, "access_token": token,
-                        "expires_at": time.time() + REFRESH_SKEW_S})
+                        "depth": depth, "protocol": 2})
     async with websockets.connect(WS_URL, ssl=_ssl_context(), server_hostname=SERVER_NAME,
                                   open_timeout=20, close_timeout=5,
                                   ping_interval=30, max_size=2 ** 20) as ws:
@@ -96,7 +101,16 @@ async def _ask_worker(question: str, depth: str, token: str) -> str:
             if remaining <= 0:
                 return "research: the worker did not answer before the deadline."
             msg = json.loads(await asyncio.wait_for(ws.recv(), timeout=remaining))
+            if not isinstance(msg, dict) or msg.get('id') != job_id:
+                return 'research: invalid worker response binding'
             kind = msg.get("type")
+            if kind == 'inference':
+                try:
+                    reply = await broker.infer(msg)
+                except Exception:
+                    return 'research: bounded inference refused or failed'
+                await ws.send(json.dumps(reply))
+                continue
             if kind == "progress":
                 logger.info("research %s: %s round=%s pages=%s", job_id[:8],
                             msg.get("stage"), msg.get("round"), msg.get("pages"))
@@ -108,6 +122,11 @@ async def _ask_worker(question: str, depth: str, token: str) -> str:
 
 
 def _research(question: str = "", depth: str = "quick", **_: Any) -> str:
+    from alfie_permissions import authorize, Denied
+    try:
+        authorize('research', {'question': question, 'depth': depth})
+    except Denied as exc:
+        return 'research: ' + str(exc)
     question = (question or "").strip()
     if not question:
         return "research: question was empty."
@@ -135,9 +154,15 @@ def _available() -> bool:
     return all(os.path.exists(p) for p in (CLIENT_CERT, CLIENT_KEY, CA_CERT))
 
 
+def tool_handler(args, **_):
+    if not isinstance(args, dict) or set(args) - {'question', 'depth'}:
+        return 'research: invalid arguments'
+    return _research(**args)
+
+
 def register(ctx) -> None:
     ctx.register_tool(
-        name="research", toolset="websearch", handler=_research,
+        name="research", toolset="websearch", handler=tool_handler,
         description=_SCHEMA["description"], schema=_SCHEMA,
         emoji="\U0001f50e", check_fn=_available,
     )

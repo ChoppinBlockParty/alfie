@@ -1,9 +1,10 @@
 import importlib.util,json
 from pathlib import Path
-spec=importlib.util.spec_from_file_location('google_preflight','/tmp/alfie-google-plugin.py')
+spec=importlib.util.spec_from_file_location('google_preflight','/opt/data/plugins/google_workspace/__init__.py')
 p=importlib.util.module_from_spec(spec);spec.loader.exec_module(p)
 p.SCRIPT=Path('/opt/data/skills/productivity/google-workspace/scripts/google_api.py')
-result=p.google_workspace('gmail.labels',{})
+# Operator-only connector health probe. Model reads must use authenticated scope review.
+result=p.run_google(['gmail','labels'])
 try: payload=json.loads(result)
 except ValueError: payload=None
 if isinstance(payload,dict) and payload.get('error'):

@@ -36,6 +36,6 @@ ENV PATH=/opt/venv/bin:$PATH \
 USER 10000:10000
 EXPOSE 8770
 
-# No credential is baked in and none is read from the environment: the access token
-# arrives in the WebSocket frame, per job, and is dropped with the job.
+# No model credential is baked in or accepted in a job. Inference is brokered by
+# the gateway over the existing authenticated connection.
 ENTRYPOINT ["/opt/venv/bin/python3", "/opt/websearch/server.py"]

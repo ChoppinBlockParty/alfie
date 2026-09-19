@@ -1,13 +1,14 @@
-"""WebSocket server: one job at a time, mutual TLS, no credential on disk.
+"""Public worker: mutual TLS, one killable research process, no model credentials.
 
-The gateway is the client and connects to wss://websearch:8770. The access token
-rides every ask and is dropped when the job ends — nothing is retained between jobs.
+Inference is brokered over the existing gateway connection. Legacy token-bearing asks fail
+closed. Public retrieval credentials remain in this worker; model tokens never enter it.
 """
 from __future__ import annotations
 
 import asyncio
 import json
 import logging
+import multiprocessing
 import os
 import resource
 import ssl
@@ -17,7 +18,6 @@ from typing import Any, Dict, Optional
 
 import websockets
 
-import codex
 import research
 import browser
 
@@ -28,6 +28,29 @@ CERT = os.environ.get("WEBSEARCH_CERT", "/etc/websearch/server.crt")
 KEY = os.environ.get("WEBSEARCH_KEY", "/etc/websearch/server.key")
 CA = os.environ.get("WEBSEARCH_CA", "/etc/websearch/ca.crt")
 HEARTBEAT_S = 60
+
+
+def _research_child(connection, question, depth):
+    """Spawned process, no inherited gateway secrets. Parent enforces the wall deadline."""
+    def ask(client, model, instructions, user, timeout):
+        connection.send({'kind': 'inference', 'model': model, 'instructions': instructions, 'user': user})
+        if not connection.poll(min(125, timeout + 5)):
+            raise TimeoutError('Inference broker unavailable')
+        response = connection.recv()
+        if not isinstance(response, dict) or not isinstance(response.get('data'), dict):
+            raise ValueError('Invalid broker response')
+        return response['data'], response['tokens']
+
+    def progress(stage, info):
+        connection.send({'kind': 'progress', 'stage': stage,
+                         **{key: value for key, value in info.items() if key in ('round', 'pages')}})
+    try:
+        result = research.run(question, depth, None, on_progress=progress, ask_fn=ask)
+        connection.send({'kind': 'result', 'brief': result, 'text': research.render(result)})
+    except Exception:
+        connection.send({'kind': 'error'})
+    finally:
+        connection.close()
 
 
 class _Redactor(logging.Filter):
@@ -76,8 +99,6 @@ class Worker:
                     await self._browser(ws, msg)
                 elif kind == "cancel":
                     self._cancelled.add(msg.get("id", ""))
-                elif kind == "token":
-                    pass  # belt-and-braces; the token rides every ask
                 else:
                     await self._error(ws, msg.get("id", ""), "bad_type", f"unknown type {kind!r}")
         except websockets.ConnectionClosed:
@@ -88,60 +109,66 @@ class Worker:
         if self._busy or self.browser.active:
             await self._error(ws, job_id, "busy", "a job is already in flight")
             return
-        question = str(msg.get("question", "")).strip()
-        if not question:
+        if set(msg) != {'type', 'id', 'question', 'depth', 'protocol'} or msg.get('protocol') != 2:
+            await self._error(ws, job_id, 'bad_protocol', 'credential-free protocol required')
+            return
+        question = msg.get('question')
+        if not isinstance(question, str) or not question.strip() or len(question.encode()) > 16000:
             await self._error(ws, job_id, "bad_request", "question was empty")
-            return
-
-        # bytearray so this module controls the one copy it owns and can zeroize it.
-        # Copies made inside the OpenAI SDK are released to the garbage collector, not
-        # overwritten — wiping is best-effort and the README says so plainly.
-        token = bytearray((msg.get("access_token") or "").encode())
-        if not token:
-            await self._error(ws, job_id, "no_token", "ask carried no access token")
-            return
-        expires_at = msg.get("expires_at")
-        if isinstance(expires_at, (int, float)) and expires_at <= time.time():
-            _zero(token)
-            await self._error(ws, job_id, "token_expired", "access token already expired")
             return
 
         depth = msg.get("depth") if msg.get("depth") in research.DEPTHS else "quick"
         self._busy = True
-        beat: Optional[asyncio.Task] = None
-        client = None
-        state: Dict[str, Any] = {"stage": "start", "round": 0, "pages": 0, "tokens": 0}
+        context = multiprocessing.get_context('spawn')
+        parent, child = context.Pipe()
+        process = context.Process(target=_research_child, args=(child, question, depth), daemon=True)
+        deadline = time.monotonic() + research.DEADLINE_S
+        call = 0
         try:
-            client = codex.make_client(token.decode())
-            beat = asyncio.create_task(self._heartbeat(ws, job_id, state))
-
-            def on_progress(stage: str, info: Dict[str, Any]) -> None:
-                state["stage"] = stage
-                state.update({k: v for k, v in info.items() if k in ("round", "pages")})
-
-            brief = await asyncio.to_thread(
-                research.run, question, depth, client, on_progress=on_progress)
-            if job_id in self._cancelled:
-                self._cancelled.discard(job_id)
-                return
-            await ws.send(json.dumps({"type": "result", "id": job_id, "brief": brief,
-                                      "text": research.render(brief)}))
-        except codex.RefusedBaseURL as exc:
-            await self._error(ws, job_id, "refused_base_url", str(exc))
-        except research.VendorFailed as exc:
-            await self._error(ws, job_id, "vendor_failed", str(exc))
-        except Exception as exc:  # noqa: BLE001 — every failure is an error frame
-            LOG.exception("job failed")
-            await self._error(ws, job_id, "failed", f"{type(exc).__name__}: {exc}")
+            process.start()
+            child.close()
+            while True:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0 or getattr(ws, 'close_code', None) is not None:
+                    raise TimeoutError('Research deadline or disconnect')
+                if not await asyncio.to_thread(parent.poll, min(.2, remaining)):
+                    if not process.is_alive():
+                        raise ValueError('Research process stopped')
+                    continue
+                frame = parent.recv()
+                kind = frame.get('kind')
+                if kind == 'inference':
+                    call += 1
+                    if call > (3 if depth == 'quick' else 5):
+                        raise ValueError('Inference request budget exceeded')
+                    await ws.send(json.dumps({'type': 'inference', 'id': job_id, 'call': call,
+                        'model': frame['model'], 'instructions': frame['instructions'], 'user': frame['user']}))
+                    response = json.loads(await asyncio.wait_for(ws.recv(), timeout=min(125, remaining)))
+                    if not isinstance(response, dict) or response.get('type') != 'inference_result' \
+                            or response.get('id') != job_id or response.get('call') != call:
+                        raise ValueError('Inference response binding mismatch')
+                    parent.send(response)
+                elif kind == 'progress':
+                    await ws.send(json.dumps({'type': 'progress', 'id': job_id,
+                        **{key: frame[key] for key in ('stage', 'round', 'pages') if key in frame}}))
+                elif kind == 'result':
+                    await ws.send(json.dumps({'type': 'result', 'id': job_id,
+                                              'brief': frame['brief'], 'text': frame['text']}))
+                    return
+                else:
+                    raise ValueError('Research process failed')
+        except Exception:
+            await self._error(ws, job_id, 'failed', 'Research stopped; no automatic retry')
         finally:
-            if beat:
-                beat.cancel()
-            _zero(token)
-            if client is not None:
-                try:
-                    client.close()
-                except Exception:  # noqa: BLE001 — closing must not mask the real error
-                    pass
+            if process.pid is not None:
+                if process.is_alive():
+                    process.terminate()
+                await asyncio.to_thread(process.join, 2)
+                if process.is_alive():
+                    process.kill()
+                    await asyncio.to_thread(process.join, 2)
+            parent.close()
+            child.close()
             self._busy = False
 
     async def _browser(self, ws, msg):

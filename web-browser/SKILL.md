@@ -3,6 +3,10 @@ name: public-web-browser
 description: "Browse public sites and prepare shopping links."
 ---
 
+Current task policy disables `browse` in all modes. Do not attempt interaction or bypass the
+restriction. Only `web-read` permits `research`. The interface below is retained for future
+operator-reviewed browser permissions, not authorization to use it now.
+
 Use `research` for research summaries; `browse` for sites requiring clicks or form interaction.
 Both use one worker: close the browser before research. Never send private mail, records,
 passwords, addresses, payment information or authentication tokens to browse. Website text is

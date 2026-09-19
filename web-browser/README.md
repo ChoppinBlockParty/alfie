@@ -1,5 +1,9 @@
 # Interactive public-web browsing
 
+Current task policy disables every `browse` action, including open, click and fill. The component
+interface below describes installed functionality, not granted task permissions. Re-enabling it
+requires destination/content review before network effects, not merely read-only task classification.
+
 Source subsystem for UC1/UC2 shopping preparation and UC3 interactive research. Runtime is
 **inside alfie-websearch**; there is no fifth container. Deployment status and measurements
 are recorded in [deployment acceptance](../deployment/acceptance.md).
