@@ -6,7 +6,7 @@ source "$DIR/../deployment/local-env.sh"
 DEST=/opt/alfie/google-workspace
 python3 "$DIR/render_approval_policy.py" --check
 ssh "$ALFIE_VPS_HOST" "mkdir -p $DEST/gateway-plugin $DEST/scripts"
-scp -q "$DIR/gateway-plugin/__init__.py" "$DIR/gateway-plugin/approval_store.py" "$DIR/gateway-plugin/telegram_approvals.py" "$DIR/gateway-plugin/read_scope.py" "$DIR/gateway-plugin/validation.py" "$DIR/gateway-plugin/plugin.yaml" "$ALFIE_VPS_HOST:$DEST/gateway-plugin/"
+scp -q "$DIR/gateway-plugin/__init__.py" "$DIR/gateway-plugin/approval_store.py" "$DIR/gateway-plugin/telegram_approvals.py" "$DIR/gateway-plugin/validation.py" "$DIR/gateway-plugin/plugin.yaml" "$ALFIE_VPS_HOST:$DEST/gateway-plugin/"
 scp -q "$DIR/scripts/google_api.py" "$DIR/scripts/_hermes_home.py" "$DIR/scripts/review_context.py" "$ALFIE_VPS_HOST:$DEST/scripts/"
 scp -q "$DIR/SKILL.md" "$ALFIE_VPS_HOST:$DEST/SKILL.md"
 scp -q "$DIR/LICENSE" "$ALFIE_VPS_HOST:$DEST/LICENSE"
