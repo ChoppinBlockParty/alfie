@@ -12,8 +12,6 @@ import time
 from types import SimpleNamespace, ModuleType
 import unittest
 from unittest.mock import AsyncMock, Mock, patch
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / 'task-permissions'))
-import alfie_permissions as permissions
 
 from test_approvals import plugin, store
 
@@ -99,9 +97,6 @@ class StoreTests(unittest.TestCase):
 
 class TelegramTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
-        token = permissions.CURRENT.set(permissions.Grant('fixture', 'gmail.send', '123', '123',
-                                                        'telegram', '10', 'Synthetic task', time.time() + 60))
-        self.addCleanup(permissions.CURRENT.reset, token)
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.path = Path(self.temp.name) / 'private' / 'actions.sqlite'
@@ -127,7 +122,7 @@ class TelegramTests(unittest.IsolatedAsyncioTestCase):
     async def pending(self):
         return (await self.bridge.present('gmail.send', {'to': 'recipient@example.com', 'subject': 'Synthetic',
                                           'body': 'Synthetic body'},
-                                          dict(BINDING, task_grant=permissions.task_snapshot('gmail.send'))))['request_id']
+                                          dict(BINDING, review_context={'effect': 'synthetic'})))['request_id']
 
     def query(self, rid, choice='a'):
         return SimpleNamespace(from_user=SimpleNamespace(id=123, is_bot=False),
@@ -143,7 +138,7 @@ class TelegramTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(self.native.bot.send_message.call_args.kwargs['parse_mode'])
         await self.bridge.decide(self.query(rid))
         self.execute.assert_called_once_with('gmail.send', {'to': 'recipient@example.com', 'subject': 'Synthetic', 'body': 'Synthetic body'},
-            dict(BINDING, task_grant=permissions.task_snapshot('gmail.send')))
+            dict(BINDING, review_context={'effect': 'synthetic'}))
         with self.assertRaises(ValueError):
             await self.bridge.decide(self.query(rid))
 
@@ -203,11 +198,6 @@ class TelegramTests(unittest.IsolatedAsyncioTestCase):
 
 
 class PreparationTests(unittest.TestCase):
-    def setUp(self):
-        self.grant = permissions.Grant('fixture', 'drive.create-folder', '123', '123',
-                                      'telegram', '10', 'Synthetic task', time.time() + 60)
-        token = permissions.CURRENT.set(self.grant)
-        self.addCleanup(permissions.CURRENT.reset, token)
     def test_dedicated_policy_is_separate_from_email_delivery(self):
         policy_spec = importlib.util.spec_from_file_location(
             'render_approval_policy', Path(__file__).parent / 'render_approval_policy.py')
@@ -269,8 +259,6 @@ class PreparationTests(unittest.TestCase):
             execute.assert_not_called()
         with patch.object(plugin, 'run_google', return_value='[]') as execute, \
                 patch.object(plugin, '_bridge', Mock(confirm_read=Mock(return_value=True))):
-            from dataclasses import replace
-            permissions.CURRENT.set(replace(self.grant, mode='email-read'))
             self.assertEqual(registry.dispatch('google_workspace',
                 {'operation': 'gmail.labels', 'arguments': {}}, scope=manager.scope_key), '[]')
             execute.assert_called_once_with(['gmail', 'labels'])
@@ -284,11 +272,9 @@ class PreparationTests(unittest.TestCase):
             self.assertEqual(args['subject'], 'Re: Synthetic')
             read.assert_called_once()
         with patch.object(plugin, 'run_google', return_value='{"status":"sent"}') as execute:
-            from dataclasses import replace
-            permissions.CURRENT.set(replace(self.grant, mode='gmail.reply'))
             with patch.object(plugin, 'review_context', return_value={'effect': 'synthetic'}):
                 plugin.execute_approved(operation, args, dict(BINDING, review_context={'effect': 'synthetic'},
-                    task_grant=permissions.task_snapshot('gmail.reply')))
+                    source_thread=''))
             self.assertEqual(execute.call_args.args[0][0:2], ['gmail', 'send'])
 
     def test_header_injection_rejected(self):

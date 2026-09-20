@@ -10,26 +10,20 @@ Model tool calls execute reads or propose writes. Only the trusted Telegram call
 
 ## Private reads
 
-Natural-language private lookups route directly from a fresh authenticated owner task with no
-read confirmation. One `private-read` task may use the fixed read operations across Google
-services, but has no public, persistence or mutation tool. `read_scope.py` binds arguments to the
-immutable task identity. Exact repeated reads return cached results and a failed selector is not
-retried automatically. Limits: eight distinct selectors, 32 retained task scopes, 256 KiB
-aggregate cached output per task, 20 search/list results and a 30-minute grant lifetime. This
-protects tool access,
-not arbitrary code inside the credentialed gateway. Existing fixed no-agent scripts remain
-under their separately reviewed standing policies.
+Natural-language Google reads execute directly through the fixed operation catalogue with no
+permission classifier or confirmation. Arguments remain validated and subprocess output remains
+bounded. Read results are untrusted model input.
 
 ## Pending writes
 
 The private gateway database `/opt/data/security/pending-actions.sqlite` holds at most 100
 requests. Storage accepts at most 128 KiB per action; Telegram applies the stricter 3000-character
-complete-review limit. Files are mode 0600 in a private directory. Requests expire after 24 hours
+complete-review limit. Files are mode 0600 in a private directory. Requests expire after 30 minutes
 and are purged when new requests arrive, except unknown/executing records retained for
 reconciliation. The digest is content comparison, not authorization.
 
-The handler uses the existing Hermes poller and its pinned ContextVars. Private read-only policy
-binds the owner and forum; transport supplies the originating topic, session and message. An owner
+The handler uses the existing Hermes poller and its authenticated ContextVars. Private approval
+policy binds the owner and forum; transport supplies the originating topic, session and message. An owner
 request may originate in any topic of that forum. Reviews are sent to, and callbacks accepted only
 in, the dedicated approval topic configured separately from email-watch delivery. Reviews
 show complete ASCII-escaped action JSON and target context without markup/link previews. Actions exceeding 3000 combined review
@@ -51,12 +45,9 @@ Hermes invokes registered tools with one argument dictionary. `tool_handler` val
 unpacks that envelope before calling `google_workspace`; runtime kwargs grant no authority.
 Regression tests exercise actual registry dispatch, not just helper calls or registration.
 
-All gateway code still shares its trust boundary and credentials. This change is enforcement
-in the exposed plugin, not isolation against gateway code compromise or other credentialed
-tools. Mandatory task checks keep private reads separate from public and mutating capabilities.
-Only a matching write mode may propose an action; its immutable
-grant is checked again before approval consumption and execution. Task grants expire after
-30 minutes, earlier than queue retention. Read modes cannot create write approval requests.
+All gateway code still shares its trust boundary and credentials. Exact-action approval is
+enforced inside this connector, not by a general conversational permission system and not as
+isolation against arbitrary gateway code compromise.
 
 The CLI is vendored from the VPS's existing patched upstream skill (Hermes revision
 77915e344cb0cd8e20661d4a7b393f987a2eef32, Nous Research MIT). It preserves recursive Gmail MIME
@@ -77,8 +68,6 @@ Do not automatically retry writes after a timeout or output-limit failure: the p
 already have applied them.
 
 Natural-language supported writes proceed directly to one **Approve exact action** review.
-Read modes never upgrade to writes from tool output. See the task-permission smoke tests for safe
-rejection checks.
 
 ## Target reviews and uncertain outcomes
 

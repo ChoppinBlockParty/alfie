@@ -199,10 +199,6 @@ finally: call(action='close',session_id=sid)
 
 RESEARCH = r'''
 import importlib.util
-import time
-if importlib.util.find_spec('alfie_permissions'):
- from alfie_permissions import CURRENT, Grant
- CURRENT.set(Grant('public-acceptance','web-read','synthetic','synthetic','operator-acceptance','synthetic','Public example domain research',time.time()+600))
 spec=importlib.util.spec_from_file_location('research_acceptance','/opt/data/plugins/websearch/__init__.py')
 p=importlib.util.module_from_spec(spec);spec.loader.exec_module(p)
 text=p._research('What is the purpose of the example.com domain? Cite IANA.', 'quick')
@@ -254,12 +250,7 @@ def main():
         if pid.isdigit():
             subprocess.run(['docker','exec','alfie','kill','-TERM',pid],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
         listener.wait(timeout=10)
-    task_policy=subprocess.run(['docker','exec','alfie','test','-f','/opt/hermes/alfie_permissions.py'],capture_output=True).returncode==0
-    if task_policy:
-        ok=run('alfie',Path('/opt/alfie/task-permissions/live_acceptance.py').read_text(),gateway=True) and ok
-        print('STATUS task policy acceptance includes bounded browser authorization; direct worker checks remain separate')
-    else:
-        ok=run('alfie',BROWSER,gateway=True,timeout=240) and ok
+    ok=run('alfie',BROWSER,gateway=True,timeout=240) and ok
     if args.research: ok=run('alfie',RESEARCH,gateway=True,timeout=350) and ok
     return 0 if ok else 1
 if __name__=='__main__':sys.exit(main())

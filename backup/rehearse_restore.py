@@ -29,7 +29,7 @@ def rehearse(archive, destination):
                 raise ValueError('Unsafe archive path')
             selected = item.name == 'recovery-manifest.json' or item.name in (
                 'project/data/config.yaml', 'project/docker-compose.alfie.yml',
-                'project/task-permissions/cron-policy.json') or item.name.endswith(
+                'project/retired-cron-policy.json') or item.name.endswith(
                 ('.db', '.db-wal', '.db-shm', '.sqlite', '.sqlite-wal', '.sqlite-shm', '.sqlite3'))
             if not selected:
                 continue

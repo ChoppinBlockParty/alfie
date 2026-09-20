@@ -1,4 +1,4 @@
-# Alfie sandbox — the container the gateway reaches over SSH (main-spec.md D9).
+# Alfie sandbox — the container the gateway reaches over SSH (README.md).
 #
 # Built from debian:13, the same base as upstream's own image (Dockerfile:52).
 # No unofficial Docker Hub namespace, which also rules out upstream's default

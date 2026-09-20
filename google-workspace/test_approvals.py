@@ -66,11 +66,7 @@ class ApprovalTests(unittest.TestCase):
             self.assertIn('error', result)
             execute.assert_not_called()
 
-    def test_read_operations_require_authenticated_task_before_execution(self):
-        import alfie_permissions as permissions
-        token = permissions.CURRENT.set(permissions.Grant(uuid.uuid4().hex, 'email-read', '123', '123',
-            'telegram', '10', 'Synthetic labels', time.time() + 60))
-        self.addCleanup(permissions.CURRENT.reset, token)
+    def test_read_operations_execute_directly(self):
         bridge = Mock()
         with patch.object(plugin, '_bridge', bridge), patch.object(plugin, 'bounded_run') as execute, patch.object(store, 'propose') as queue:
             execute.return_value.returncode = 0

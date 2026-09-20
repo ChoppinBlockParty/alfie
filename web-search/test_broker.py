@@ -3,16 +3,13 @@ import hashlib
 import importlib.util
 from pathlib import Path
 import sys
-import time
 from types import SimpleNamespace
 import unittest
 from unittest.mock import AsyncMock, Mock, patch
 
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT / 'worker'))
-sys.path.insert(0, str(ROOT.parent / 'task-permissions'))
 import research
-import alfie_permissions as policy
 spec = importlib.util.spec_from_file_location('test_inference_broker', ROOT / 'gateway-plugin/inference_broker.py')
 broker = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(broker)
@@ -42,11 +39,6 @@ class BrokerValidationTests(unittest.TestCase):
 
 
 class BrokerExecutionTests(unittest.IsolatedAsyncioTestCase):
-    async def asyncSetUp(self):
-        token = policy.CURRENT.set(policy.Grant('synthetic', 'web-read', '123', '-1001',
-                                                'operator-test', '1', 'Synthetic', time.time() + 60))
-        self.addCleanup(policy.CURRENT.reset, token)
-
     async def test_fixed_transport_no_tools_and_bounded_result(self):
         class Stream:
             close = AsyncMock()
@@ -68,15 +60,8 @@ class BrokerExecutionTests(unittest.IsolatedAsyncioTestCase):
         stream.close.assert_awaited_once()
         client.close.assert_awaited_once()
 
-    async def test_private_grant_and_spent_budget_never_construct_client(self):
+    async def test_spent_budget_never_constructs_client(self):
         instance = broker.Broker('synthetic-token', 'synthetic-job', 'quick')
         instance.calls = 3
         with self.assertRaises(ValueError):
             await instance.infer(frame(call=4))
-        token = policy.CURRENT.set(policy.Grant('synthetic', 'email-read', '123', '-1001',
-                                                'operator-test', '1', 'Synthetic', time.time() + 60))
-        try:
-            with self.assertRaises(policy.Denied):
-                await broker.Broker('synthetic-token', 'synthetic-job', 'quick').infer(frame())
-        finally:
-            policy.CURRENT.reset(token)

@@ -1,7 +1,0 @@
-name: reminders
-version: 1.0.0
-description: Owner-only, tool-free local reminders with fixed delivery.
-author: Alfie
-kind: backend
-provides_tools:
-  - reminder

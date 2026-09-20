@@ -50,8 +50,8 @@ delete Drive files. They check size/checksum and produce a private receipt. Unce
 requires reconciliation; resumable transfers have no blind automatic retries.
 
 `transfer_host.py` stages ciphertext in the gateway, uploads it, downloads it again, verifies its
-SHA-256 and removes only its explicit temporary transfer files. Model task grants cannot invoke
-this operator path. Same-account compromise could delete Drive backups; offline key custody
+SHA-256 and removes only its explicit temporary transfer files. The model cannot invoke this
+operator path. Same-account compromise could delete Drive backups; offline key custody
 does not protect availability. Google Drive is not immutable/offline storage.
 
 ## Recovery rehearsal

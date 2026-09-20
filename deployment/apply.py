@@ -32,8 +32,6 @@ mounts=[
  '/opt/alfie/google-workspace/scripts:/opt/data/skills/productivity/google-workspace/scripts:ro',
  '/opt/alfie/google-workspace/gateway-plugin:/opt/data/plugins/google_workspace:ro',
  '/opt/alfie/web-browser/gateway-plugin:/opt/data/plugins/web_browser:ro',
- '/opt/alfie/reminders/gateway-plugin:/opt/data/plugins/reminders:ro',
- '/opt/alfie/media/alfie_media.py:/opt/hermes/alfie_media.py:ro',
  '/opt/alfie/deployment/file_safety.py:/opt/hermes/agent/file_safety.py:ro',
  '/opt/alfie/deployment/credential_files.py:/opt/hermes/tools/credential_files.py:ro',
  '/opt/alfie/websearch/gateway-plugin:/opt/data/plugins/websearch:ro',
@@ -41,6 +39,11 @@ mounts=[
  '/opt/alfie/web-browser/SKILL.md:/opt/data/skills/personal/public-web-browser/SKILL.md:ro',
 ]
 vol=gateway.setdefault('volumes',[])
+obsolete_destinations={'/opt/hermes/alfie_permissions.py','/opt/alfie-permissions/cron-policy.json',
+                       '/opt/hermes/alfie_media.py','/opt/data/plugins/reminders'}
+vol[:]=[v for v in vol if not (isinstance(v,str) and len(v.split(':')) >= 2 and
+    (v.split(':')[0].startswith('/opt/alfie/task-permissions/') or
+     v.split(':')[1] in obsolete_destinations))]
 for relative in ('scripts/email_watch.py', 'scripts/email_watch_validation.py',
                  'skills/personal/email-watch/SKILL.md'):
     target=root/'data'/relative
@@ -51,7 +54,7 @@ for mount in mounts:
     target=mount.split(':')[1]
     vol[:]=[v for v in vol if not (isinstance(v,str) and v.split(':')[1]==target)]
     vol.append(mount)
-for path in ('plugins/google_workspace','plugins/web_browser','plugins/reminders','skills/personal/public-web-browser'):
+for path in ('plugins/google_workspace','plugins/web_browser','skills/personal/public-web-browser'):
     p=root/'data'/path;p.mkdir(parents=True,exist_ok=True);os.chown(p,10000,10000)
 # An actual file target is needed for the single-file mount.
 p=root/'data/skills/personal/public-web-browser/SKILL.md'
@@ -87,7 +90,10 @@ stt['enabled']=True
 stt.setdefault('local',{}).update(model='base',language='en',vad=False,
                                   no_speech_prob_threshold=0.75,logprob_threshold=-1.3)
 plugins=c.setdefault('plugins',{})
-for name in ('websearch','google_workspace','web_browser','reminders'):
+plugins.setdefault('enabled',[])[:]=[name for name in plugins.get('enabled',[]) if name!='reminders']
+plugins.setdefault('disabled',[])[:]=[name for name in plugins.get('disabled',[]) if name!='reminders']
+plugins.setdefault('entries',{}).pop('reminders',None)
+for name in ('websearch','google_workspace','web_browser'):
     if name not in plugins.setdefault('enabled',[]): plugins['enabled'].append(name)
     plugins['disabled']=[x for x in plugins.get('disabled',[]) if x!=name]
     plugins.setdefault('entries',{})[name]={'allow_tool_override':False}
@@ -96,7 +102,8 @@ for name in ('browser','web'):
     if name not in agent.setdefault('disabled_toolsets',[]): agent['disabled_toolsets'].append(name)
 for platform,toolsets in c.get('platform_toolsets',{}).items():
     if isinstance(toolsets,list):
-        for name in ('websearch','google_workspace','web_browser','reminders'):
+        toolsets[:]=[name for name in toolsets if name!='reminders']
+        for name in ('websearch','google_workspace','web_browser'):
             if name not in toolsets: toolsets.append(name)
 # Replace on-host skill file as well; file_sync reads host-backed content inside gateway.
 shutil.copyfile(root/'google-workspace/SKILL.md',root/'data/skills/productivity/google-workspace/SKILL.md')

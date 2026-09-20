@@ -59,8 +59,6 @@ class Broker:
         self.deadline = time.monotonic() + 300
 
     async def infer(self, message):
-        from alfie_permissions import authorize
-        authorize('research', {})
         validate_request(message, self.job, self.calls + 1)
         remaining = self.deadline - time.monotonic()
         if self.calls >= self.limit or self.tokens >= 120000 or remaining <= 0:

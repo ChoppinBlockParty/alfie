@@ -122,11 +122,6 @@ async def _ask_worker(question: str, depth: str, token: str) -> str:
 
 
 def _research(question: str = "", depth: str = "quick", **_: Any) -> str:
-    from alfie_permissions import authorize, Denied
-    try:
-        authorize('research', {'question': question, 'depth': depth})
-    except Denied as exc:
-        return 'research: ' + str(exc)
     question = (question or "").strip()
     if not question:
         return "research: question was empty."

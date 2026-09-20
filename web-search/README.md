@@ -1,8 +1,7 @@
 # Web research and shared public-web worker
 
-The deployed task policy permits `research` only in `web-read`, with fresh context and no private
-Google tools or memory injection. The registered handler unwraps the Hermes argument dictionary
-and checks the immutable grant. Browser interaction is currently disabled in all task modes.
+The native assistant may call `research` directly. The registered handler validates its fixed
+argument envelope; worker isolation and the bounded protocol provide the security boundary.
 
 UC3. `research(question, depth)` runs plan → search → select → read → analyse → repeat →
 synthesise in alfie-websearch and returns a bounded brief. `web-browser/` supplies interactive
@@ -40,8 +39,8 @@ Messages:
 The gateway plugin resolves OpenAI authentication before dispatch with refresh skew 420 seconds
 (300-second task plus 120-second margin). Access token, refresh token and auth.json now stay in
 the gateway. `gateway-plugin/inference_broker.py` uses the existing subscription transport and
-gpt-5.5 with no tools or paid fallback. It validates each call against the live task grant,
-job/sequence, exact instruction hashes and a three-call quick/five-call deep budget. Inputs are
+gpt-5.5 with no tools or paid fallback. It validates each call against the job/sequence,
+exact instruction hashes and a three-call quick/five-call deep budget. Inputs are
 bounded to 256 KiB and output to 64 KiB; network streams have a maximum 120-second deadline and
 are closed on failure. The 120,000-token limit is checked from reported usage, not a prepaid cap.
 Response event handling follows the [OpenAI streaming guide](https://developers.openai.com/api/docs/guides/streaming-responses);

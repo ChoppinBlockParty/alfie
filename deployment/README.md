@@ -2,20 +2,16 @@
 
 This subsystem coordinates the VPS selected by `ALFIE_VPS_HOST` in ignored `.env.local`. It is not a fresh-host
 installer: Docker, Hermes, Compose, gateway credentials, SSH keys and existing volumes must
-already exist. Current topology is in [main-spec](../main-spec.md); verified results are in
+already exist. Current topology is in the [root README](../README.md); verified results are in
 [acceptance](acceptance.md).
 
 ## Build and activate
 
 The four-container security increment is deployed and automated acceptance passed. Telegram
 Google approvals use the existing poller; real owner clicks remain the acceptance gate.
-Email-derived Calendar/records/timezone changes are disabled. Task-scoped private/public isolation
-and the broader security contract remain open; see [integration requirements](telegram-approvals.md).
-
-Voice/photo preprocessing is maintained independently in `media/`. Run `bash media/deploy.sh`
-for that subsystem. Its activation backs up the current deployment, installs the allowlisted
-pinned STT dependency and recreates only the gateway. During active development, an actual owner
-Telegram voice/photo request is the practical integration check.
+Email-derived Calendar/records/timezone changes are disabled. See
+[Telegram approvals](telegram-approvals.md) for the remaining connector-level write boundary.
+Voice and photo input use Hermes's native media pipeline.
 
 For this existing-image increment, `bash deployment/deploy-security.sh` backs up configuration
 and live SQLite consistently, stops the gateway before replacing mounted code, stages approvals

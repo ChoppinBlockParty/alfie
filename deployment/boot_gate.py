@@ -4,7 +4,6 @@ on-failure:5 does not auto-start containers on daemon restart. The oneshot start
 only after the firewall unit has succeeded. Existing containers/images are retained.
 """
 import argparse
-import hashlib
 import json
 from pathlib import Path
 import subprocess
@@ -31,18 +30,6 @@ def start():
     subprocess.run(['systemctl', 'is-active', '--quiet', 'alfie-docker-firewall.service'], check=True)
     items = json.loads(call(['docker', 'inspect', *NAMES]))
     check_policies(items)
-    gateway = next(item for item in items if item['Name'] == '/alfie')
-    mounts = {m['Destination']: m for m in gateway['Mounts']}
-    runtime = root / 'task-permissions/runtime'
-    manifest = json.loads((runtime / 'manifest.json').read_text())
-    for name, hashes in manifest.items():
-        mount = mounts.get('/opt/hermes/' + name)
-        if not mount or mount['RW'] or Path(mount['Source']) != runtime / name \
-                or hashlib.sha256((runtime / name).read_bytes()).hexdigest() != hashes['patched']:
-            raise ValueError('Task overlay drift: automatic startup denied')
-    for destination in ('/opt/hermes/alfie_permissions.py', '/opt/alfie-permissions/cron-policy.json'):
-        if destination not in mounts or mounts[destination]['RW']:
-            raise ValueError('Task policy mount missing or writable')
     subprocess.run(['docker', 'start', *NAMES], check=True, stdout=subprocess.DEVNULL)
     print('PASS Alfie started after firewall policy')
 

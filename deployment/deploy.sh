@@ -16,7 +16,6 @@ bash "$DIR/../email-watch/stage.sh"
 "$DIR/../sandbox/deploy.sh"
 "$DIR/../egress/deploy.sh"
 "$DIR/../web-browser/deploy.sh"
-bash "$DIR/../reminders/deploy.sh"
 scp -q "$DIR/../web-browser/seccomp_profile.json" "$DIR/../web-browser/smoke_chromium.py" "$ALFIE_VPS_HOST:/opt/alfie/web-browser/"
 ssh "$ALFIE_VPS_HOST" 'docker run --rm --network none --read-only --tmpfs /tmp:rw,nosuid,nodev,size=384m,mode=1777 --memory 1280m --memory-swap 1280m --pids-limit 256 --cap-drop ALL --security-opt no-new-privileges:true --security-opt seccomp=/opt/alfie/web-browser/seccomp_profile.json -v /opt/alfie/web-browser/smoke_chromium.py:/test.py:ro --entrypoint /opt/venv/bin/python3 alfie-websearch:latest /test.py'
 ssh "$ALFIE_VPS_HOST" 'bash /opt/alfie/deployment/activate.sh'

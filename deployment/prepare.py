@@ -27,9 +27,7 @@ for path in paths:
         shutil.copy2(src,dst)
 for path in ('/opt/alfie/data/plugins/websearch', '/opt/alfie/data/skills/personal/public-web-browser',
              '/opt/alfie/email-watch',
-             '/opt/alfie/task-permissions',
              '/opt/alfie/google-workspace', '/opt/alfie/web-browser',
-             '/opt/alfie/reminders', '/opt/alfie/media',
              '/opt/alfie/websearch/gateway-plugin', '/opt/alfie/websearch/runtime'):
     src=Path(path)
     if src.exists(): shutil.copytree(src,backup/src.relative_to('/'),dirs_exist_ok=True)

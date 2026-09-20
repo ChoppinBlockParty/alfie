@@ -7,8 +7,6 @@ import time
 import os
 import subprocess
 from unittest.mock import Mock, patch
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / 'task-permissions'))
-import alfie_permissions as permissions
 spec = importlib.util.spec_from_file_location('google_plugin', Path(__file__).parent/'gateway-plugin/__init__.py')
 p = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(p)
@@ -32,10 +30,6 @@ class BoundaryTests(unittest.TestCase):
             p.bounded_run([sys.executable, '-c', code], {'PATH': '/usr/bin:/bin'}, timeout=.1)
         self.assertLess(time.monotonic() - started, 3)
 
-    def setUp(self):
-        token = permissions.CURRENT.set(permissions.Grant('fixture', 'drive.create-folder', '123', '123',
-                                                        'telegram', '10', 'Synthetic task', time.time() + 60))
-        self.addCleanup(permissions.CURRENT.reset, token)
     def test_registered_handler_accepts_runtime_argument_envelope(self):
         ctx = Mock()
         p.register(ctx)

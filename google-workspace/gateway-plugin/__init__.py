@@ -16,9 +16,6 @@ _spec = importlib.util.spec_from_file_location(
     'alfie_approval_store', Path(__file__).with_name('approval_store.py'))
 _approvals = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_approvals)
-_read_spec = importlib.util.spec_from_file_location('alfie_read_scope', Path(__file__).with_name('read_scope.py'))
-_reads = importlib.util.module_from_spec(_read_spec)
-_read_spec.loader.exec_module(_reads)
 _validation_spec = importlib.util.spec_from_file_location('alfie_google_validation', Path(__file__).with_name('validation.py'))
 _validation = importlib.util.module_from_spec(_validation_spec)
 _validation_spec.loader.exec_module(_validation)
@@ -104,13 +101,7 @@ def google_workspace(operation='', arguments=None, **_):
             return json.dumps({'error': str(exc)})
         except Exception:
             return json.dumps({'error': 'Could not queue action for owner review; no change made.'})
-    try:
-        if _bridge is None:
-            raise ValueError('Authenticated private-read policy is unavailable')
-        return _reads.run(operation, arguments or {},
-                          lambda op, args: run_google(build_args(op, args)))
-    except (ValueError, TypeError) as exc:
-        return json.dumps({'error': str(exc)})
+    return run_google(argv)
 
 
 def bounded_run(argv, env, *, timeout=60, limit=256 * 1024):
@@ -191,8 +182,8 @@ def prepare_action(operation, arguments):
 def execute_approved(operation, arguments, authorization=None):
     if operation == 'security.self-test' and arguments == {'notice': 'No Google API call or account change.'}:
         return {'status': 'self-test completed'}
-    from alfie_permissions import validate_approval
-    validate_approval(authorization or {}, {'operation': operation, 'arguments': arguments})
+    if not isinstance(authorization, dict) or not authorization.get('review_context'):
+        raise ValueError('Missing authenticated exact-action review')
     # No dynamic reply resolution or read/arbitrary command can be approved.
     if operation in READ_OPERATIONS or operation == 'gmail.reply':
         raise ValueError('Invalid approved operation')
@@ -236,11 +227,6 @@ def tool_handler(args, **_):
     """
     if not isinstance(args, dict) or set(args) != {'operation', 'arguments'}:
         return json.dumps({'error': 'Expected operation and arguments fields only'})
-    from alfie_permissions import authorize, Denied
-    try:
-        authorize('google_workspace', args)
-    except Denied as exc:
-        return json.dumps({'error': str(exc)})
     return google_workspace(operation=args['operation'], arguments=args['arguments'])
 
 

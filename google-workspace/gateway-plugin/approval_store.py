@@ -13,7 +13,7 @@ import uuid
 from contextlib import closing
 from contextlib import contextmanager
 
-TTL_S = 24 * 60 * 60
+TTL_S = 30 * 60
 MAX_PENDING = 100
 MAX_ACTION_BYTES = 128 * 1024
 STORE = Path('/opt/data/security/pending-actions.sqlite')

@@ -3,7 +3,7 @@ from pathlib import Path
 spec=importlib.util.spec_from_file_location('google_preflight','/opt/data/plugins/google_workspace/__init__.py')
 p=importlib.util.module_from_spec(spec);spec.loader.exec_module(p)
 p.SCRIPT=Path('/opt/data/skills/productivity/google-workspace/scripts/google_api.py')
-# Operator-only connector health probe. Model reads require an authenticated private-read grant.
+# Operator-only connector health probe.
 result=p.run_google(['gmail','labels'])
 try: payload=json.loads(result)
 except ValueError: payload=None

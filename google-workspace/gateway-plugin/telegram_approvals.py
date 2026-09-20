@@ -1,7 +1,7 @@
 """Deterministic owner-only Telegram reviews in the existing Hermes poller.
 
-This is not a model tool. The pinned gateway ContextVars, never environment identity
-or tool arguments, bind proposals. Private policy is staged read-only with the plugin.
+This is not a model tool. Hermes's authenticated session ContextVars, never model-supplied
+identity or tool arguments, bind proposals. Private policy is staged read-only with the plugin.
 """
 import asyncio
 import json
@@ -78,10 +78,7 @@ class TelegramApprovals:
             raise ApplicationHandlerStop
 
     def propose(self, operation, arguments):
-        from alfie_permissions import task_snapshot
-        task_grant = task_snapshot(operation)
         binding = trusted_binding(self.policy)
-        binding['task_grant'] = task_grant
         operation, arguments = self.prepare(operation, arguments)
         if self.review_context is None:
             raise ValueError('Target review resolver unavailable')
@@ -157,11 +154,14 @@ class TelegramApprovals:
             raise ValueError('Invalid choice')
         await query.answer('Processing review')
         async with self.lock:
-            from alfie_permissions import validate_approval
             def validate(binding, action):
                 if action == {'operation': 'security.self-test', 'arguments': {'notice': 'No Google API call or account change.'}}:
                     return
-                validate_approval(binding, action)
+                if any(binding.get(key) != self.policy[key] for key in ('user', 'chat', 'thread')) \
+                        or not binding.get('session') or not binding.get('source_message') \
+                        or not isinstance(binding.get('review_context'), dict) \
+                        or not isinstance(action, dict) or set(action) != {'operation', 'arguments'}:
+                    raise ValueError('Exact-action review binding is invalid')
             action = self.store.consume(request_id, origin, message.message_id, self.epoch, choice == 'a', validate=validate)
             if action is None:
                 status = 'rejected'

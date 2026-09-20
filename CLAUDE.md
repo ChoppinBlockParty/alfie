@@ -2,17 +2,17 @@
 
 This is a project to build, update and maintain persona AI agent, called Alfie.
 
-main-spec.md is the current specification of the project and its status plan. It holds current state only; history lives in git.
+README.md is the current specification of the project and its status plan. It holds current state only; history lives in git.
 plan-next.md is the executable plan for the next build.
 
-Each subsystem is a subproject directory (first: `email-watch/`) with its own README (authoritative for its internals), sources and `deploy.sh`. Change a subsystem there, then deploy; main-spec.md keeps only how it fits the whole.
+Each subsystem is a subproject directory (first: `email-watch/`) with its own README (authoritative for its internals), sources and `deploy.sh`. Change a subsystem there, then deploy; the root README keeps only how it fits the whole.
 
 ## Core Instructions
 
-* Usefulness is a core requirement. Routine conversation and lookups should work from ordinary
-  language, without mode-prefix memorization or repeated permission prompts. Security must bound
-  task effects and data flow, not make the personal assistant unusable. Preserve exact-action
-  approvals for account changes and private/public separation; explain genuine limitations plainly.
+* Usefulness is a core requirement. Routine conversation, media and lookups should follow Hermes's
+  native flow without classifiers, mode prefixes or preliminary permission prompts. Keep safety at
+  concrete effect boundaries. Preserve exact-action approvals for account changes and explain
+  genuine limitations plainly.
 * Be concise and clear. Keep answers short unless asked to be comprehensive.
 * Technical tone. No metaphors, idioms or filler.
 * Ask a follow-up question when something is ambiguous instead of guessing.
