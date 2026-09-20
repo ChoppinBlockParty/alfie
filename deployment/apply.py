@@ -33,6 +33,7 @@ mounts=[
  '/opt/alfie/google-workspace/gateway-plugin:/opt/data/plugins/google_workspace:ro',
  '/opt/alfie/web-browser/gateway-plugin:/opt/data/plugins/web_browser:ro',
  '/opt/alfie/reminders/gateway-plugin:/opt/data/plugins/reminders:ro',
+ '/opt/alfie/media/alfie_media.py:/opt/hermes/alfie_media.py:ro',
  '/opt/alfie/deployment/file_safety.py:/opt/hermes/agent/file_safety.py:ro',
  '/opt/alfie/deployment/credential_files.py:/opt/hermes/tools/credential_files.py:ro',
  '/opt/alfie/websearch/gateway-plugin:/opt/data/plugins/websearch:ro',
@@ -81,6 +82,10 @@ config=root/'data/config.yaml'
 c=yaml.safe_load(config.read_text())
 c.setdefault('cron',{})['wrap_response']=False
 c.setdefault('terminal',{})['credential_files']=[]
+stt=c.setdefault('stt',{})
+stt['enabled']=True
+stt.setdefault('local',{}).update(model='base',language='en',vad=False,
+                                  no_speech_prob_threshold=0.75,logprob_threshold=-1.3)
 plugins=c.setdefault('plugins',{})
 for name in ('websearch','google_workspace','web_browser','reminders'):
     if name not in plugins.setdefault('enabled',[]): plugins['enabled'].append(name)

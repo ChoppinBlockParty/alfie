@@ -32,6 +32,8 @@ class ReminderTests(unittest.TestCase):
         return value
 
     def test_safe_shape_rejects_privileged_fields_and_other_owners(self):
+        self.assertEqual(set(plugin.SCHEMA['parameters']['properties']['action']['enum']),
+                         {'create', 'list', 'pause', 'resume'})
         self.assertTrue(policy.safe_reminder_job(self.job(), {'user': '123', 'chat': '-1001'}))
         for changes in ({'script': 'x.py'}, {'deliver': 'all'}, {'enabled_toolsets': ['web']},
                         {'origin': {'platform': 'telegram', 'user_id': '999', 'chat_id': '-1001'}},
@@ -60,7 +62,8 @@ class ReminderTests(unittest.TestCase):
             listed = json.loads(plugin.reminder(action='list'))
             self.assertEqual([r['id'] for r in listed['reminders']], ['job-1'])
             policy.CURRENT.set(self.grant)
-            self.assertIn('not found', json.loads(plugin.reminder(action='remove', job_id='foreign'))['error'])
+            self.assertIn('outside', json.loads(plugin.reminder(action='remove', job_id='job-1'))['error'])
+            self.assertIn('not found', json.loads(plugin.reminder(action='pause', job_id='foreign'))['error'])
             self.assertTrue(json.loads(plugin.reminder(action='pause', job_id='job-1'))['success'])
         self.assertEqual(calls, [{'action': 'pause', 'job_id': 'job-1'}])
 

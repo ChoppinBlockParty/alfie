@@ -3,13 +3,13 @@ import json
 
 SCHEMA = {
     'name': 'reminder',
-    'description': ('Create, list, pause, resume or cancel owner-only reminders. Reminders run '
+    'description': ('Create, list, pause or resume owner-only reminders. Cancellation uses pause. Reminders run '
                     'without tools and deliver only to the originating owner chat. This tool cannot '
                     'schedule scripts, web/account work, alternate destinations or chained jobs.'),
     'parameters': {
         'type': 'object',
         'properties': {
-            'action': {'type': 'string', 'enum': ['create', 'list', 'pause', 'resume', 'remove']},
+            'action': {'type': 'string', 'enum': ['create', 'list', 'pause', 'resume']},
             'text': {'type': 'string', 'description': 'Reminder text; required for create.'},
             'schedule': {'type': 'string', 'description': "For example 'in 30m', 'tomorrow at 9am', or 'every monday 9am'."},
             'name': {'type': 'string', 'description': 'Optional short label.'},

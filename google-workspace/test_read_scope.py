@@ -14,7 +14,7 @@ class ReadScopeTests(unittest.TestCase):
     def setUp(self):
         self.gate = plugin._reads
         self.gate._states.clear()
-        token = permissions.CURRENT.set(permissions.Grant(uuid.uuid4().hex, 'email-read', '123', '123',
+        token = permissions.CURRENT.set(permissions.Grant(uuid.uuid4().hex, 'private-read', '123', '123',
             'telegram', '10', 'Find synthetic booking', time.time() + 60))
         self.addCleanup(permissions.CURRENT.reset, token)
         self.execute = Mock(return_value='[{"id":"selected"}]')
@@ -22,19 +22,27 @@ class ReadScopeTests(unittest.TestCase):
     def run_read(self, op='gmail.search', args=None):
         return self.gate.run(op, args if args is not None else {'query': 'booking'}, self.execute)
 
-    def test_query_pinned_results_cached_and_only_returned_ids_readable(self):
+    def test_multiple_bounded_selectors_and_services_are_cached(self):
         self.run_read()
         self.run_read()
         self.execute.assert_called_once_with('gmail.search', {'query': 'booking', 'max': 20})
-        for op, args in [('gmail.search', {'query': 'password'}), ('gmail.get', {'message_id': 'unselected'}),
-                         ('gmail.labels', {}), ('gmail.search', {'query': 'booking', 'max': 1})]:
-            with self.assertRaises(ValueError): self.run_read(op, args)
         self.execute.return_value = '{"body":"synthetic"}'
         self.run_read('gmail.get', {'message_id': 'selected'})
+        self.execute.return_value = '[]'
+        self.run_read('calendar.list', {'max': 5})
+        self.assertEqual(self.execute.call_count, 3)
+
+    def test_selector_budget_blocks_unbounded_read_expansion(self):
+        self.execute.return_value = '[]'
+        with patch.object(self.gate, 'MAX_SELECTORS', 2):
+            self.run_read('gmail.search', {'query': 'one'})
+            self.run_read('drive.search', {'query': 'two'})
+            with self.assertRaises(ValueError):
+                self.run_read('contacts.list', {})
 
     def test_non_owner_task_source_never_executes(self):
         old = permissions.current()
-        token = permissions.CURRENT.set(permissions.Grant('different', 'email-read', old.owner, old.chat,
+        token = permissions.CURRENT.set(permissions.Grant('different', 'private-read', old.owner, old.chat,
             'cron', '11', 'Another task', time.time()+60))
         try:
             with self.assertRaises(ValueError): self.run_read()
@@ -45,7 +53,6 @@ class ReadScopeTests(unittest.TestCase):
     def test_malformed_results_do_not_grant_ids_and_cannot_retry(self):
         self.execute.return_value = '{"id":"selected"}'
         with self.assertRaises(ValueError): self.run_read()
-        with self.assertRaises(ValueError): self.run_read('gmail.get', {'message_id': 'selected'})
         self.assertIn('error', self.run_read())
         self.execute.assert_called_once()
 
@@ -55,7 +62,7 @@ class ReadScopeTests(unittest.TestCase):
         with patch.object(self.gate, 'MAX_BYTES', 1), self.assertRaises(ValueError):
             self.run_read('gmail.get', {'message_id': 'selected'})
         old = permissions.current()
-        token = permissions.CURRENT.set(permissions.Grant('different', 'email-read', old.owner, old.chat,
+        token = permissions.CURRENT.set(permissions.Grant('different', 'private-read', old.owner, old.chat,
             'telegram', '11', 'Another task', time.time()+60))
         try:
             self.run_read('gmail.get', {'message_id': 'selected'})

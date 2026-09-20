@@ -11,7 +11,7 @@ from tools.registry import registry
 def main():
     discover_plugins()
     owner = json.loads(Path('/opt/data/plugins/google_workspace/approval-policy.json').read_text())
-    for mode in ('email-read', 'web-read'):
+    for mode in ('private-read', 'web-read'):
         token = CURRENT.set(Grant(uuid.uuid4().hex, mode, owner['user'], owner['chat'],
                                   'operator-acceptance', 'synthetic', 'Synthetic acceptance', time.time() + 60))
         try:
@@ -24,7 +24,7 @@ def main():
             ):
                 result = json.loads(registry.dispatch(tool, args))
                 assert result.get('error'), (mode, tool)
-            if mode == 'email-read':
+            if mode == 'private-read':
                 # A disposable docker-exec process has no live Telegram adapter bridge;
                 # verify policy authorization here. The operator health probe owns API health.
                 from alfie_permissions import authorize
@@ -37,7 +37,22 @@ def main():
                 authorize('browse', {'action': 'open'})
         finally:
             CURRENT.reset(token)
-    print('PASS email/web tasks deny sends, memory, cron, shell and unknown browser actions; bounded read/browser paths work')
+    print('PASS private/web read tasks deny sends, memory, cron, shell and unknown browser actions; bounded read/browser paths work')
+    token = CURRENT.set(Grant(uuid.uuid4().hex, 'memory-write', owner['user'], owner['chat'],
+                              'operator-acceptance', 'synthetic', 'Synthetic acceptance', time.time() + 60))
+    try:
+        from alfie_permissions import authorize, Denied
+        for args in ({'action': 'remove', 'old_text': 'synthetic'},
+                     {'action': 'replace', 'old_text': 'synthetic', 'content': 'changed'}):
+            try:
+                authorize('memory', args)
+            except Denied:
+                pass
+            else:
+                raise AssertionError('Destructive memory operation authorized')
+    finally:
+        CURRENT.reset(token)
+    print('PASS destructive memory operations are unavailable')
     result = json.loads(registry.dispatch('google_workspace', {'operation': 'gmail.labels', 'arguments': {}}))
     assert result.get('error')
     print('PASS absent task context cannot read Google')

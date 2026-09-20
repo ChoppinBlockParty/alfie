@@ -1,25 +1,22 @@
 # Task permissions contract
 
-Status: initial enforcement deployed on 2026-09-19 using existing containers.
-Implementation: [task-permissions](../task-permissions/README.md). The contract below remains
-the target; not every planned capability is available yet.
+Status: effect-oriented redesign deployed on 2026-09-20. Initial enforcement was deployed on
+2026-09-19. Implementation: [task-permissions](../task-permissions/README.md).
 
-Usability requirement (P0): ordinary owner language must work without prefix memorization.
-Replace the brittle classifier, not the authorization boundary. Minimize unnecessary confirmation
-friction while keeping selected-data limits, private/public separation and exact-action write review.
+Usability requirement: ordinary owner language must work without prefix memorization. Chat and
+read-only work require no approval. Security decisions follow effects and data destinations, not
+how many Google products a read happens to use.
 
-Implemented: authenticated owner-text classification, immutable expiring grants, mandatory
-tool checks, fresh task context, Google approval checks and frozen cron fingerprints. A bounded
-tool-free model proposes one fixed mode and deterministic code validates it. Supported natural-
-language Google writes require only the separate exact-action review. Explicit operation prefixes
-remain supported. Read tasks cannot propose writes. Disposable public browsing, isolated local
-memory, narrow tool-free reminders, authenticated voice and chat-only photographs are enabled.
-Shell, delegation, general cron and messaging are disabled. Unknown requests/sources fail closed.
-The one pre-existing active reminder retains a
-operator-reviewed tool-free grant; two completed reminders remain disabled. Two reviewed fixed
-scripts remain permitted. Private reads automatically pin their first bounded selector and returned
-IDs; query expansion requires a new task. Private exports and broader attachment handling are not
-implemented. The shared credentialed
+The simplified catalogue has two external read boundaries: `private-read` for all fixed Google
+reads, and `web-read` for the isolated public worker. They never coexist in one task. A bounded
+tool-free model chooses the boundary from only the current authenticated owner text; uncertainty
+falls back to tool-free chat. Every Google mutation still requires one immutable exact-action
+Telegram review. Memory is additive only, reminder cancellation is recoverable pause, and unknown
+tools, shell, delegation, general cron and arbitrary messaging remain disabled.
+The one pre-existing active reminder retains an operator-reviewed tool-free grant; two completed
+reminders remain disabled. Two reviewed fixed scripts remain permitted. Private reads are bounded
+to eight selectors and 256 KiB in a no-egress task. Private exports and broader attachment handling
+are not implemented. The shared credentialed
 gateway remains a trust boundary; this is not protection against arbitrary gateway code execution.
 Implement inside the existing four containers without an additional service.
 
@@ -35,22 +32,44 @@ Email/web/document content, tool results, stored memories and quoted or forwarde
 are data; they cannot establish a new owner request or change permissions. A scheduler firing
 does not grant the job all owner privileges. A forum topic selects routing, not permissions.
 
-Classification proposes a bounded category and resource scope. Deterministic policy validates
-that proposal against source authority and a fixed catalogue. The classifier must not invent
-capability names, destinations or approval rights. Uncertain intent asks the owner to clarify;
-failure denies execution. Do not use keyword matches alone to authorize account mutations.
+Classification proposes a bounded category. Deterministic policy validates it against source
+authority and a fixed catalogue. The classifier cannot invent capability names, destinations or
+approval rights. Uncertainty receives only chat, never an external capability. Do not use keyword
+matches or model confidence alone to authorize account mutations.
 Classification is fallible and does not replace the existing exact-action approval requirement.
 
 Separate four dimensions: data readable, actions permitted, destinations permitted, and durable
-state writable. Permission to read one private service does not grant all other private services.
+state writable. Private Google services may be read together because the task has no destination
+except the authenticated owner; public browsing, persistence and mutations stay unavailable.
 
 | Original task | Permitted scope | Excluded scope |
 |---|---|---|
-| Find something in my emails | Bounded Gmail search/get and answer to owner | Send/reply/modify, send approval requests, Calendar/Drive, public web, durable memory changes |
+| Find something in my emails and calendar | Up to eight bounded selectors across fixed Google reads; answer to owner | Any account mutation, public web, durable memory changes |
 | Find something on the internet | Public brief, public search/page reads, answer to owner | Private reads/history, email or other account writes, memory changes, form submission, cron changes |
-| Draft a reply | Selected email context and draft displayed to owner | Sending, send approval requests, unrelated private resources, public export |
-| Send an email | Prepare the explicitly requested send for exact-action review | Execution without approval, unrelated writes or extra resources |
+| Draft a reply | Selected email context and draft displayed to owner | Sending, send approval requests, public export |
+| Send/reply or change an account item | Bounded private reads to identify the target, then one matching exact-action review | Execution without approval, a second mutation, public web or persistence |
 | Scheduled email digest | Reviewed bounded mail reads/extraction, private processing ledger, fixed owner delivery | Send/reply, Calendar changes, personal memory/policy changes, public web |
+
+## Dangerous effects and enforced outcome
+
+| Dangerous case | Policy outcome |
+|---|---|
+| A web page asks for memories, mail, calendar, contacts, documents or prior private answers | Denied: `web-read` has no memory snapshot or Google tool. |
+| An email, document, image or tool result asks Alfie to send, publish, persist or delete data | It is untrusted data and cannot change the task grant. Read modes cannot create write reviews; an owner-requested write task can only propose its one matching effect for review. |
+| One request asks to combine private Google data with public search/browsing | Rejected as mixed. The owner must separate the tasks; no private-derived brief enters the public worker. |
+| Sending or replying to email, including private content | The complete recipient, headers and body are frozen and shown in an authenticated Telegram review; rejection, expiry or mismatch makes no change. |
+| Calendar deletion, Gmail label changes, Sheet replacement/appending, Doc append, or other exposed Google mutation | One task may propose one exact action. It executes once only after its complete target/effect review; changed targets and replay are denied. |
+| Deleting or replacing persistent Alfie memory | Not exposed to the assistant. `memory-write` can add one bounded fact from the current owner message and receives no old-memory snapshot. |
+| Deleting a reminder | Not exposed. “Cancel” pauses the selected owner-only reminder, so it can be resumed. |
+| A retrieved item attempts to poison durable memory | Denied: private/public read modes have no memory tool; memory-add tasks contain no retrieved data or existing memory snapshot. |
+| Browser login, payment, upload/download, personal-data form entry or arbitrary script execution | Denied by task policy and the isolated browser/worker contract. |
+| A forged tool call, approval flag, task ID, callback, expired grant or changed cron definition | Denied by deterministic checks outside the model. |
+| Replying to the authenticated owner with private data they requested | Allowed. Telegram owner delivery is the intended private destination. |
+
+The configured model provider necessarily processes classifier input and the selected task's model
+input/results. The credentialed gateway, Telegram account, operator host and provider remain trust
+boundaries; these controls address model/tool misuse and prompt injection, not compromise of those
+trusted systems.
 
 Operational audit records, delivery bookkeeping and temporary browser state are separately
 allowlisted runtime effects. They are not permission to add facts/preferences to personal memory.

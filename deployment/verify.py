@@ -211,7 +211,6 @@ print(('FAIL ' if failed else 'PASS ')+'research end-to-end; output_chars='+str(
 if failed: raise RuntimeError('research unavailable')
 '''
 
-
 def main():
     if '@@' in '@@ALFIE_PUBLIC_IPV4@@':
         raise SystemExit('Run the rendered verify.py installed by deployment/deploy.sh')

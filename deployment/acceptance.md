@@ -2,6 +2,40 @@
 
 ## Latest verified increments
 
+- Telegram media preprocessing is now a separate subsystem instead of policy-classifier code.
+  The prior release evidence relied on mocked ingestion and missed an unusable local STT
+  dependency. The deployed gateway now has the pinned STT runtime in its durable dependency
+  target, transcribes voice before intent classification, and sends photographs through the
+  existing vision path as tool-free, untrusted input. One-off diagnostics transcribed synthetic
+  spoken audio and analyzed a generated image through the installed runtime. That synthetic test
+  harness was then removed as disproportionate for the deeply WIP project; owner Telegram use is
+  the current integration signal.
+- The first owner retest exposed a second media defect: two valid 2.0--2.6 second Telegram Opus
+  clips decoded correctly but were discarded as speech by the combined VAD and confidence defaults.
+  Testing the cached clips without printing their transcripts showed that a bounded short-voice
+  profile recovered them. The media subsystem now owns that profile and verifies configuration
+  drift during activation. The permission-layer hard failure was also removed: STT remains the
+  native Hermes path, and an empty result continues as a tool-free media response instead of
+  rejecting the owner's message.
+- Effect-oriented permission redesign deployed. Ordinary requests now choose tool-free chat,
+  bounded all-service private Google reads, isolated public reads, additive memory, recoverable
+  reminders, or one reviewed Google mutation. Private reads allow eight selectors/256 KiB but
+  have no web, persistence or mutation path; an explicit write task may use bounded private reads
+  to identify its target and then issue one matching proposal. Memory replacement/removal and
+  reminder deletion are unavailable; cancellation pauses. The obsolete preliminary scope-review
+  callback was removed. Eight configured-model probes covered personal facts, cross-service reads,
+  public research, send intent, mixed private/public denial, memory, reminders and quoted malicious
+  text. Local suites ran 135 tests (six environment-dependent skips). Post-cutover classifier,
+  installed-schema, effect-denial, backup-readability and full deployment/network verification
+  passed, including the operator-only Google labels health read. Owner Telegram UX remains to be
+  retested.
+- Personal-fact routing fix deployed after the configured classifier returned `unclear` for the
+  owner's question `what is my inleg length`. Personal facts, measurements and preferences are now
+  explicitly chat tasks, and any remaining `unclear` proposal falls back to tool-free chat rather
+  than a generic permission-domain response. The exact reported text classified as `chat` after
+  cutover with its original brief unchanged and no tools. Local suites passed 26 task-permission
+  tests and 47 Google tests (two integration tests skipped); live denial checks and the latest
+  rollback-backup readability check passed. Owner Telegram answer quality remains to be retested.
 - Natural-language/use-case release deployed with the existing four containers and no new
   dependency. Eight synthetic calls through the live configured subscription model correctly
   classified email, web, Google write, memory, reminder and chat requests, rejected a mixed
@@ -19,8 +53,8 @@
   Google writes go directly to the immutable exact-action card; the model still cannot approve or
   execute it. Memory is isolated to chat/memory tasks. New reminders are owner-only and tool-free.
   Voice is transcribed before classification; photographs are forced to chat-only and their
-  vision/OCR text cannot grant tools. Other attachments remain blocked. These media paths have
-  runtime/unit evidence but no new owner Telegram media smoke test in this cutover.
+  vision/OCR text cannot grant tools. Other attachments remain blocked. The later media-subsystem
+  evidence above supersedes this increment's mocked/runtime-only media evidence.
 
 The remaining bullets in this section record earlier increments. Later evidence above supersedes
 their statements about read-scope buttons, preliminary write-scope reviews and disabled use cases.

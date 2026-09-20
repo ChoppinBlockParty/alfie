@@ -1,4 +1,9 @@
-"""Task-local private reads pinned to the first bounded selector in an owner task."""
+"""Bounded task-local private reads for an authenticated owner task.
+
+Private reads may span Google services because their results can only return to the owner and the
+task has no public or mutating tools. Each distinct selector remains bounded, cached and counted;
+failed selectors cannot be retried inside the task.
+"""
 import json
 import threading
 import time
@@ -6,6 +11,7 @@ import time
 MAX_TASKS = 32
 MAX_RESULTS = 20
 MAX_BYTES = 256 * 1024
+MAX_SELECTORS = 8
 _states = {}
 _lock = threading.Lock()
 
@@ -34,30 +40,15 @@ def run(operation, arguments, execute):
         if grant.task not in _states:
             if len(_states) >= MAX_TASKS:
                 raise ValueError('Private read capacity reached')
-            _states[grant.task] = dict(grant=grant, lock=threading.Lock(), selector=None,
-                                       attempted=False, ids=set(), cache={}, size=0, child=None)
+            _states[grant.task] = dict(grant=grant, lock=threading.Lock(), cache={}, size=0)
         state = _states[grant.task]
     with state['lock']:
         if state['grant'] != current():
             raise ValueError('Read task identity changed')
-        if state['selector'] is None:
-            if state['attempted']:
-                raise ValueError('Private read failed; start a new task')
-            state['attempted'] = True
-            # The mode was selected from the authenticated owner's current message before
-            # any private data was loaded. Pin the model's first bounded selector; later
-            # untrusted results can only fetch IDs returned by that exact search.
-            current()
-            state['selector'] = selector
-            state['child'] = {'gmail.search': ('gmail.get', 'message_id'),
-                              'drive.search': ('drive.get', 'file_id')}.get(operation)
-        elif selector != state['selector']:
-            child = state['child']
-            if not child or operation != child[0] or set(args) != {child[1]} \
-                    or args[child[1]] not in state['ids']:
-                raise ValueError('Read exceeds the initial selector or returned resource IDs; start a new task')
         if selector in state['cache']:
             return state['cache'][selector]
+        if len(state['cache']) >= MAX_SELECTORS:
+            raise ValueError('Private read selector budget exhausted; start a new task')
         # Reserve before execution: failure cannot trigger an automatic retry or new search.
         state['cache'][selector] = json.dumps({'error': 'Read outcome unavailable; start a new task'})
         if state['size'] >= MAX_BYTES:
@@ -71,7 +62,6 @@ def run(operation, arguments, execute):
                     not isinstance(row, dict) or not isinstance(row.get('id'), str) or
                     not row['id'] or len(row['id']) > 256 for row in rows):
                 raise ValueError('Search result schema invalid; no resource IDs granted')
-            state['ids'] = {row['id'] for row in rows}
         state['size'] += len(result.encode())
         state['cache'][selector] = result
         return result

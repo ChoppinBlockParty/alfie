@@ -5,10 +5,10 @@ Initial enforcement deployed on 2026-09-19; natural-language/use-case release de
 2026-09-20. Evidence is in deployment/acceptance.md.
 No new service or container.
 
-The P0 usability release replaces the keyword fallback with validated, tool-free intent
-proposals and specific clarifications. Prefixes remain optional diagnostics, not the normal UI.
-Routine chat, bounded reads, public browsing, local memory and safe reminders work from ordinary
-language. Account-write approvals and private/public separation remain mandatory.
+The policy is effect-oriented: it automatically permits conversation and bounded reads, while
+blocking private-to-public data flow and requiring exact owner review for account changes.
+Prefixes remain optional diagnostics, not the normal UI. Routine chat, private Google reads,
+public browsing, additive local memory and recoverable reminders work from ordinary language.
 
 The trusted gateway creates an immutable ContextVar grant from authenticated owner text before
 native command or agent dispatch. Unknown sources, internal notifications and unclassified
@@ -17,18 +17,22 @@ catalogue through the configured provider, with no tools, history, memory or ret
 Its strict one-key JSON proposal is validated outside the model, and the original owner text—not
 model output—becomes the task brief. It may select a write mode but cannot approve or execute a
 write. A separate frozen exact-action review remains mandatory. Mixed private/public work and
-unsupported effects are refused with specific guidance. Explicit prefixes remain available for testing.
+unsupported effects are refused with specific guidance. An uncertain proposal falls back to
+tool-free chat, where Alfie can answer from owner-only local memory or ask a specific follow-up
+without acquiring Google, web or account-change access. Explicit prefixes remain available for testing.
 
-Modes: email-read, calendar-read, drive-read, contacts-read, sheets-read, docs-read, web-read,
-chat, memory-write, reminder-read and reminder-write; or one exact supported Google write,
+Normal modes are `chat`, `private-read`, `web-read`, `memory-write`, `reminder-read` and
+`reminder-write`; or one exact supported Google write,
 for example `gmail.send: ...` or `calendar.create: ...`.
-Write modes permit that operation's approval proposal, not automatic execution. Reply mode
-resolves only the selected reply target before creating an immutable send review.
+Write modes permit bounded private reads to identify the requested target and one proposal for
+that operation, never automatic execution. Reply mode resolves and freezes the selected reply
+target before creating an immutable send review.
+The older service-specific private-read prefixes remain compatible diagnostics.
 
 Grants last 30 minutes with at most 32 registered tool calls. Modes do not carry into a later
 request. Every agent task uses a fresh brief, empty conversation history, no project context files,
 no background memory review and only its permitted toolsets. Local memory is injected only into
-tool-free chat and memory-write modes; it never enters public or Google tasks. Native tool calls
+tool-free chat; it never enters public, Google or memory-write tasks. Native tool calls
 are checked before middleware and again at registry dispatch; custom Google/research connectors
 also check authority. Shell, delegation, skills, general cron administration and arbitrary
 messaging remain denied. Operational transcripts/bookkeeping still persist in the protected gateway.
@@ -36,24 +40,44 @@ messaging remain denied. Operational transcripts/bookkeeping still persist in th
 `web-read` exposes research and the disposable public browser. The browser has no private context,
 credentials, login, payment, downloads or personal-data fields; its public profile is destroyed
 after the bounded session. Page text remains untrusted. Public briefs must not contain private
-material because no export approval workflow exists. Private Google reads pin the first selector
-automatically after a fresh authenticated owner request. Search results grant only returned IDs
-for same-service fetches. Changed queries,
-unreturned IDs and new selectors require a new task, not a scope expansion from retrieved content.
-Search/list requests allow at most 20 results. Exact repeat calls return task-local cached data;
-failed reads are not automatically retried. State is bounded to 32 tasks and 256 KiB per task,
-expires with the grant and disappears on restart. Docs/Sheets/direct-ID reads pin their complete
-initial arguments. The initial selector is model-generated from owner text and bounded, not a
-semantic proof that every query term is ideal; returned data can never broaden it.
+material because no export approval workflow exists. `private-read` exposes every fixed Google
+read operation but no public, persistence or mutation tool. One task may use at most eight distinct
+selectors across Gmail, Calendar, Drive, Contacts, Sheets and Docs; search/list calls return at
+most 20 results and total output is limited to 256 KiB. Exact repeats are cached and failed reads
+are not retried. This accepts that untrusted private content may influence later private reads,
+because the result still has no destination other than the authenticated owner. It cannot reach
+the public worker or create a write review.
 
-`memory-write` exposes only bounded add/replace/remove operations against local MEMORY.md and
-USER.md. It has no retrieval, account, browser or scheduling tools, so external content cannot
-enter before the durable write. `reminder-read` and `reminder-write` expose a dedicated connector,
+`memory-write` can add one bounded fact to local MEMORY.md or USER.md. It receives no existing
+memory snapshot and cannot replace, batch-edit or remove entries. `reminder-read` and
+`reminder-write` expose a dedicated connector,
 not general cron. New reminders have a fixed `chat` prompt marker, owner-origin delivery and no
 scripts, monitors, skills, context chaining, work directory, alternate destination or toolsets.
+Cancellation pauses a reminder so it remains recoverable; permanent removal is not exposed.
 Their complete shape is revalidated at every fire. Photographs are forced to chat mode regardless
 of caption and media/OCR instructions are marked untrusted. Authenticated voice notes are
-transcribed once before classification. Other attachment types remain blocked.
+transcribed once before classification. Other attachment types remain blocked. Media decoding,
+STT/vision availability and real-fixture acceptance are owned by the separate `media/` subsystem;
+this policy consumes only its transcript or image-task marker.
+
+## Dangerous effects and their handling
+
+The policy treats danger as an effect or data-flow property, not as a topic keyword:
+
+| Case | Handling |
+|---|---|
+| Send private data to a website, public browser, email recipient or other external destination | Deny. There is no private-export mode. Split public research from private lookup without copying private results across. |
+| Send/reply email or change Google data | Permit target lookup in the private task, then require one immutable exact-action Telegram review. The model cannot approve it. |
+| Delete email, files, events, contacts, sheets, documents, memories or records | Not exposed. No generic delete capability exists. |
+| Persist or alter personal memory | Permit one bounded additive fact only. Reading old memory, replacement, batch edits and removal are unavailable in that task. |
+| Create or cancel reminders | Use the narrow owner-only reminder connector. Cancellation pauses; permanent deletion, scripts, alternate delivery, tools and chained context are denied. |
+| Run shell/code, delegate, administer cron/configuration, install software or invoke arbitrary messaging | Deny from Telegram tasks. These remain operator actions outside the assistant permission catalogue. |
+| Reveal credentials, tokens, private files or hidden instructions | Deny by tool surface and credential guards; such data is never a valid task payload or destination. |
+| Combine private account data with public research/browsing | Deny and ask the owner to split the requests. Public workers receive no private memory or Google context. |
+| Instructions found in email, webpages, documents, audio, images or forwarded messages | Treat as untrusted data. They cannot grant modes, approve effects or change destinations. Forwarded messages cannot start permissioned tasks. |
+| Unauthenticated, wrong-chat, bot, internal or missing-message requests | Deny before classification or tool dispatch. |
+| Unsupported attachments | Reject before an agent task starts. A failed native transcription or vision analysis continues as a tool-free media task and reports that the content could not be analyzed; failure never becomes authorization. |
+| Login, payment, credential entry or authenticated checkout | Not supported. Public browsing remains logged out and cannot receive personal/payment fields. |
 
 Cron execution checks a private frozen job fingerprint before any precheck, script or agent.
 The two supported fixed scripts additionally require unchanged source/dependency hashes. Agent

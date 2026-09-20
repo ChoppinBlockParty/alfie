@@ -12,6 +12,11 @@ Google approvals use the existing poller; real owner clicks remain the acceptanc
 Email-derived Calendar/records/timezone changes are disabled. Task-scoped private/public isolation
 and the broader security contract remain open; see [integration requirements](telegram-approvals.md).
 
+Voice/photo preprocessing is maintained independently in `media/`. Run `bash media/deploy.sh`
+for that subsystem. Its activation backs up the current deployment, installs the allowlisted
+pinned STT dependency and recreates only the gateway. During active development, an actual owner
+Telegram voice/photo request is the practical integration check.
+
 For this existing-image increment, `bash deployment/deploy-security.sh` backs up configuration
 and live SQLite consistently, stops the gateway before replacing mounted code, stages approvals
 and report-only email code, recreates the sandbox, applies filtering and starts the gateway.

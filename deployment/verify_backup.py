@@ -12,7 +12,8 @@ def verify(backup):
         raise ValueError('Backup must be a private directory')
     required = ('opt/alfie/docker-compose.alfie.yml', 'opt/alfie/data/config.yaml',
                 'opt/alfie/task-permissions/alfie_permissions.py',
-                'opt/alfie/task-permissions/cron-policy.json', 'images.json')
+                'opt/alfie/task-permissions/cron-policy.json',
+                'opt/alfie/media/alfie_media.py', 'images.json')
     for name in required:
         if not (backup / name).is_file():
             raise ValueError('Required rollback artifact missing')

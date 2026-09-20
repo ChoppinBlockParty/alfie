@@ -10,15 +10,13 @@ Model tool calls execute reads or propose writes. Only the trusted Telegram call
 
 ## Private reads
 
-Natural-language private lookups route directly from a fresh authenticated owner task. The first
-read automatically pins its exact selector and 20-result maximum; this read-only path has no
-separate confirmation. It can return data only to the owner and cannot propose a write or public
-export. The task cannot ask for a second selector after receiving private content.
-`read_scope.py` binds arguments to the immutable task identity. Gmail/Drive searches
-permit subsequent gets only for IDs in the bounded result set. Direct-ID, calendar, contacts,
-Docs and Sheets reads pin all arguments. Exact repeated reads return cached results. A failed
-read is not retried automatically. Limits: 32 retained task scopes, 256 KiB aggregate cached
-output per task, 20 search/list results and a 30-minute grant lifetime. This protects tool access,
+Natural-language private lookups route directly from a fresh authenticated owner task with no
+read confirmation. One `private-read` task may use the fixed read operations across Google
+services, but has no public, persistence or mutation tool. `read_scope.py` binds arguments to the
+immutable task identity. Exact repeated reads return cached results and a failed selector is not
+retried automatically. Limits: eight distinct selectors, 32 retained task scopes, 256 KiB
+aggregate cached output per task, 20 search/list results and a 30-minute grant lifetime. This
+protects tool access,
 not arbitrary code inside the credentialed gateway. Existing fixed no-agent scripts remain
 under their separately reviewed standing policies.
 
@@ -55,8 +53,8 @@ Regression tests exercise actual registry dispatch, not just helper calls or reg
 
 All gateway code still shares its trust boundary and credentials. This change is enforcement
 in the exposed plugin, not isolation against gateway code compromise or other credentialed
-tools. Mandatory task checks restrict private reads by service/operation plus a pinned initial
-selector and returned resource IDs. Only a matching write mode may propose an action; its immutable
+tools. Mandatory task checks keep private reads separate from public and mutating capabilities.
+Only a matching write mode may propose an action; its immutable
 grant is checked again before approval consumption and execution. Task grants expire after
 30 minutes, earlier than queue retention. Read modes cannot create write approval requests.
 
@@ -78,11 +76,9 @@ every allocation inside Google's SDK; existing container resource ceilings remai
 Do not automatically retry writes after a timeout or output-limit failure: the provider may
 already have applied them.
 
-Natural-language supported writes first require **Confirm task scope** in the approvals topic.
-This only grants permission to propose that operation; the subsequent **Approve exact action**
-review remains mandatory. Scope reviews expire after three minutes or restart; read modes never
-upgrade to writes from tool output. Explicit operation prefixes bypass the scope prompt, not
-the exact-action review. See the task-permission smoke tests for safe rejection checks.
+Natural-language supported writes proceed directly to one **Approve exact action** review.
+Read modes never upgrade to writes from tool output. See the task-permission smoke tests for safe
+rejection checks.
 
 ## Target reviews and uncertain outcomes
 

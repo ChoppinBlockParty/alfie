@@ -14,6 +14,11 @@ Use code-path reasoning and small focused checks, and distinguish those from liv
 Current deployed design remains in [main-spec](main-spec.md); prior acceptance remains in
 [deployment/acceptance](deployment/acceptance.md). Git retains the completed build plan.
 
+The media regression is owned at the subsystem level: `media/` handles authenticated Telegram
+voice/photo preprocessing and installs the pinned local STT runtime durably. Synthetic media test
+infrastructure was removed while the project is deeply WIP; owner Telegram use is the integration
+signal.
+
 ## P0 — usefulness and natural-language intent (deployed)
 
 Owner requirement: the assistant must be useful, not blocked by routine permissions and rigid
@@ -25,8 +30,8 @@ wording. Deployed without relaxing exact-action account approval or private/publ
 2. Validate the proposal outside the model. Unsupported/mixed requests get a specific, useful
    clarification. The model cannot invent capabilities, authorizations or approval decisions.
 3. Normal chat and read requests must not require prefixes. Keep explicit prefixes as an optional
-   diagnostic interface. Review unnecessary read-confirmation friction while retaining bounded
-   selectors/result IDs; exact account changes always require their own owner review.
+   diagnostic interface. Private reads may use bounded selectors across Google services; exact
+   account changes always require their own owner review.
 4. Preserve all forum topics as valid request origins, the dedicated approvals topic, fixed cron
    grants, no paid fallback and current container/resource limits. Existing writes remain queued.
 5. Use small paraphrase, malformed-output and authorization regressions, installed-runtime checks
@@ -35,7 +40,7 @@ wording. Deployed without relaxing exact-action account approval or private/publ
 
 Deployment result: routine chat, public research/browser work, bounded private reads, local
 memory, safe reminders and voice/photo input work without mode-prefix memorization. Private
-reads pin their first bounded selector without a confirmation card. Supported Google writes go
+reads use a no-egress task with up to eight bounded selectors and no confirmation card. Supported Google writes go
 straight to one immutable exact-action review. Mixed private/public tasks fail with a specific
 clarification. General shell, cron, messaging, private export and unsupported attachments remain
 blocked. Next work is provider-side redirect/DNS containment and the remaining restricted
@@ -103,8 +108,8 @@ Release status and remaining gates:
    closed. Google streaming output/process-group limits are deployed. Complete
    provider-specific outcome evidence and atomic preconditions where available. Target enrichment,
    pre-execution context comparison, nested argument validation, literal Sheets values and a
-   read-only reconciliation helper are deployed. Private reads pin the first bounded selector and
-   permit only bounded returned IDs afterward, without a redundant review. Private exports remain disabled.
+   read-only reconciliation helper are deployed. Private reads are bounded by selector count,
+   result count and total bytes in a no-egress task. Private exports remain disabled.
    Expanded cron fingerprints are deployed; all five existing definitions match, three grants
    remain permitted and two completed reminders remain disabled. No jobs were executed in tests.
 
@@ -146,7 +151,7 @@ outside scope.
 | Public browser | Sandboxed Chromium, ephemeral context, bounded actions, URL checks, no account mounts. Shares worker/process environment with research; raw text returns to gateway. | Separate browser runtime and identity; public-only task context. Default inspection mode, deliberate grants for interaction. Stronger isolation from private services. |
 | Egress | Squid plus host filtering; public web worker has arbitrary public HTTP(S). Docker DNS is explicitly not an exfiltration-proof boundary. Gateway remains broadly connected. | Per-service network policy including gateway; controlled DNS; fixed connector destinations; no private-context process with arbitrary public egress. |
 | Deployment and host | Active firewall chains are flushed before reconstruction. Compose is modified from existing live configuration. Staging can replace active bind-mounted code. Reboot/restore untested. | Atomic filtering, explicit validated runtime manifest, immutable release staging, fail-closed startup and tested recovery. |
-| Voice, images and attachments | Local transcription/model vision documented; ingestion source absent. Transcribed or extracted content can contain instructions. | Isolated decoding, bounded inputs and retention; provenance survives transcription/OCR. Media text cannot itself approve actions. |
+| Voice, images and attachments | `media/` now owns deployed preprocessing/configuration; it still shares the trusted gateway process. Transcribed or extracted content can contain instructions. | Move decoding to a low-privilege process when resources permit; bound inputs/retention and preserve provenance. Media text cannot itself approve actions. |
 | Publication and operations | Local scanners pass, but source still contains owner-specific prompt text. Off-host backup and remote artifact review remain incomplete. | Manual identifier review, broader CI scanning, encrypted independent backups, patch/expiry monitoring and incident procedures. |
 
 Source anchors (line numbers refer to the reviewed source):

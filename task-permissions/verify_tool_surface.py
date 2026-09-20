@@ -37,6 +37,9 @@ for mode in policy.MODES:
                 assert params.get('properties'), mode
                 if definition['function']['name'] == 'google_workspace':
                     assert policy.MODES[mode] <= set(params['properties']['operation']['enum']), mode
+                if definition['function']['name'] == 'reminder':
+                    actions = set(params['properties']['action']['enum'])
+                    assert actions == {'create', 'list', 'pause', 'resume'}, actions
         for name in ('tool_search', 'tool_describe', 'tool_call', 'terminal', 'browse', 'memory'):
             try:
                 policy.authorize(name, {})

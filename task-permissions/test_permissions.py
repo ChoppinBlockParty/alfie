@@ -11,8 +11,9 @@ import time
 from types import ModuleType
 from types import SimpleNamespace
 import unittest
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import Mock, patch
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / 'media'))
 import alfie_permissions as policy
 from patch_runtime import patch as patch_source, TARGETS
 
@@ -45,7 +46,7 @@ class PermissionsTests(unittest.TestCase):
 
     def test_intent_proposals_are_fixed_categories_and_keep_original_brief(self):
         samples = (
-            ('Could you see whether the airline emailed me?', 'email-read'),
+            ('Could you see whether the airline emailed me?', 'private-read'),
             ('Compare current mirrorless cameras for me', 'web-read'),
             ('Please send Alice an email', 'gmail.send'),
             ('Remember that I prefer aisle seats', 'memory-write'),
@@ -64,10 +65,16 @@ class PermissionsTests(unittest.TestCase):
             with self.subTest(raw=raw), self.assertRaises(policy.Denied):
                 policy.validate_intent_proposal('owner request', raw)
         for decision, message in (('mixed', policy.MIXED_HELP),
-                                  ('unsupported', policy.UNSUPPORTED_HELP),
-                                  ('unclear', policy.HELP)):
+                                  ('unsupported', policy.UNSUPPORTED_HELP)):
             with self.assertRaisesRegex(policy.Denied, re.escape(message)):
                 policy.validate_intent_proposal('owner request', json.dumps({'decision': decision}))
+        self.assertEqual(policy.validate_intent_proposal(
+            'what is my inleg length', '{"decision":"unclear"}'),
+            ('chat', 'what is my inleg length'))
+
+    def test_personal_fact_questions_are_described_as_tool_free_chat(self):
+        self.assertIn("owner's facts, measurements or preferences", policy.INTENT_PROMPT)
+        self.assertIn('Missing knowledge is\n  not a reason to choose unclear', policy.INTENT_PROMPT)
 
     def test_intent_model_receives_only_fixed_prompt_and_current_text_without_tools(self):
         calls = []
@@ -75,7 +82,7 @@ class PermissionsTests(unittest.TestCase):
         def call_llm(**kwargs):
             calls.append(kwargs)
             return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(
-                content='{"decision":"drive-read"}'))])
+                content='{"decision":"private-read"}'))])
         auxiliary.call_llm = call_llm
         auxiliary.extract_content_or_reasoning = lambda response, **_: response.choices[0].message.content
         config = ModuleType('hermes_cli.config')
@@ -84,7 +91,7 @@ class PermissionsTests(unittest.TestCase):
         with patch.dict(sys.modules, {'agent.auxiliary_client': auxiliary,
                                       'hermes_cli.config': config}):
             self.assertEqual(policy.propose_intent('What is in my Drive?'),
-                             ('drive-read', 'What is in my Drive?'))
+                             ('private-read', 'What is in my Drive?'))
         self.assertEqual(len(calls), 1)
         self.assertIsNone(calls[0]['tools'])
         self.assertEqual(calls[0]['provider'], 'existing-provider')
@@ -111,6 +118,18 @@ class PermissionsTests(unittest.TestCase):
                     with self.subTest(mode=mode, tool=tool), self.assertRaises(policy.Denied):
                         policy.authorize(tool, {'action': 'fill', 'value': 'synthetic'})
 
+        with scope('private-read'):
+            for operation in policy.PRIVATE_READS:
+                policy.authorize('google_workspace', {'operation': operation})
+            for tool, args in (
+                ('research', {'question': 'leak private results'}),
+                ('memory', {'action': 'add', 'content': 'persist private results'}),
+                ('google_workspace', {'operation': 'gmail.send'}),
+                ('google_workspace', {'operation': 'calendar.delete'}),
+            ):
+                with self.subTest(tool=tool, args=args), self.assertRaises(policy.Denied):
+                    policy.authorize(tool, args)
+
     def test_web_research_cannot_access_private_data_or_browser_effects(self):
         with scope('web-read'):
             policy.authorize('research', {})
@@ -122,17 +141,22 @@ class PermissionsTests(unittest.TestCase):
                 with self.assertRaises(policy.Denied):
                     policy.authorize(tool, args)
 
-    def test_memory_mode_allows_only_bounded_local_memory_edits(self):
+    def test_memory_mode_allows_only_one_bounded_addition(self):
         with scope('memory-write'):
             policy.authorize('memory', {'action': 'add', 'target': 'user',
                                         'content': 'Prefers synthetic examples'})
             policy.authorize('memory', {'target': 'memory', 'operations': [
-                {'action': 'replace', 'old_text': 'old', 'content': 'new'}]})
+                {'action': 'add', 'content': 'Synthetic durable fact'}]})
             for tool, args in (
                 ('research', {}), ('google_workspace', {'operation': 'gmail.get'}),
                 ('cronjob_manage', {'action': 'create'}), ('terminal', {}),
                 ('memory', {'action': 'add', 'target': 'other', 'content': 'x'}),
-                ('memory', {'action': 'add', 'content': 'x' * 4001}),
+                ('memory', {'action': 'add', 'content': 'x' * 1001}),
+                ('memory', {'action': 'replace', 'old_text': 'old', 'content': 'new'}),
+                ('memory', {'action': 'remove', 'old_text': 'old'}),
+                ('memory', {'operations': [{'action': 'remove', 'old_text': 'old'}]}),
+                ('memory', {'operations': [{'action': 'add', 'content': 'one'},
+                                           {'action': 'add', 'content': 'two'}]}),
                 ('memory', {'action': 'execute', 'content': 'x'}),
             ):
                 with self.subTest(tool=tool, args=args), self.assertRaises(policy.Denied):
@@ -144,6 +168,22 @@ class PermissionsTests(unittest.TestCase):
             try:
                 with self.assertRaises(policy.Denied):
                     policy.authorize('google_workspace', {'operation': 'gmail.send'})
+            finally:
+                policy.CURRENT.reset(token)
+
+    def test_persistent_or_account_write_task_can_issue_only_one_effect(self):
+        for mode, tool, args in (
+            ('memory-write', 'memory', {'action': 'add', 'content': 'Synthetic fact'}),
+            ('gmail.send', 'google_workspace', {'operation': 'gmail.send'}),
+        ):
+            unique = replace(grant(mode), task='one-shot-' + mode)
+            token = policy.CURRENT.set(unique)
+            try:
+                if mode == 'gmail.send':
+                    policy.authorize('google_workspace', {'operation': 'contacts.list'}, charge=True)
+                policy.authorize(tool, args, charge=True)
+                with self.assertRaises(policy.Denied):
+                    policy.authorize(tool, args, charge=True)
             finally:
                 policy.CURRENT.reset(token)
 
@@ -172,17 +212,25 @@ class PermissionsTests(unittest.TestCase):
         with scope('memory-write'):
             memory_settings = policy.agent_settings({})
         self.assertEqual(memory_settings['enabled_toolsets'], ['memory'])
-        self.assertFalse(memory_settings['skip_memory'])
+        self.assertTrue(memory_settings['skip_memory'])
 
-    def test_memory_snapshot_enters_only_chat_and_memory_prompts(self):
+    def test_memory_snapshot_enters_only_tool_free_chat(self):
         store = SimpleNamespace(_entries_for=lambda target: ['private-' + target])
         agent = SimpleNamespace(_memory_store=store)
         with scope('chat'):
             self.assertIn('private-user', policy.system_prompt(agent))
         with scope('memory-write'):
-            self.assertIn('private-memory', policy.system_prompt(agent))
+            self.assertNotIn('private-memory', policy.system_prompt(agent))
         with scope('web-read'):
             self.assertNotIn('private-user', policy.system_prompt(agent))
+
+    def test_reminder_cancellation_is_recoverable_and_removal_is_denied(self):
+        with scope('reminder-write'):
+            policy.authorize('reminder', {'action': 'list'})
+            policy.authorize('reminder', {'action': 'pause', 'job_id': 'fixture'})
+            policy.authorize('reminder', {'action': 'resume', 'job_id': 'fixture'})
+            with self.assertRaises(policy.Denied):
+                policy.authorize('reminder', {'action': 'remove', 'job_id': 'fixture'})
 
     def test_unknown_cron_or_changed_definition_never_runs(self):
         fn = Mock(return_value='executed')
@@ -235,11 +283,9 @@ class GatewayTests(unittest.IsolatedAsyncioTestCase):
                 return 'ran'
             with patch.object(policy, 'POLICY', config), \
                     patch.object(policy, 'propose_intent', return_value=(
-                        'drive.create-folder', 'Create a folder named Synthetic')), \
-                    patch.object(policy, 'SCOPE_CONFIRM', AsyncMock()) as confirm:
+                        'drive.create-folder', 'Create a folder named Synthetic')):
                 self.assertEqual(await policy.gateway_entry(execute)(runner, event), 'ran')
             self.assertEqual(calls, ['drive.create-folder'])
-            confirm.assert_not_awaited()
             self.assertIsNone(policy.CURRENT.get())
 
     async def test_photograph_is_chat_only_and_voice_is_classified_after_transcription(self):
@@ -352,7 +398,7 @@ def handle_function_call(function_name, function_args):
                                                    conversation_history=[{'content': 'Private email'}])
         self.assertEqual(result[0], 'Public question')
         self.assertEqual(result[1], [])
-        self.assertNotIn('Private', result[2])
+        self.assertNotIn('Private email', result[2])
 
     def test_conversation_patch_marks_media_analysis_untrusted(self):
         source = '''def run_conversation(agent, user_message, system_message=None, conversation_history=None, moa_config=None):

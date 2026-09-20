@@ -1,6 +1,6 @@
 # Alfie — current specification
 
-Spec version: 0.45. Updated: 2026-09-20.
+Spec version: 0.47. Updated: 2026-09-20.
 
 Self-hosted personal AI agent with Telegram, memory, reminders, email and public-web research.
 This document describes the whole system and current decisions. Subsystem READMEs own their
@@ -14,7 +14,9 @@ authenticated owner's current text and proposes one entry from a fixed catalogue
 code validates the complete JSON response. It receives no history, retrieved content, memory,
 tools or additional credentials, and its text never becomes the task brief. Ordinary chat, reads,
 public browsing, memory and reminders do not require mode prefixes. Mixed private/public work and
-unsupported effects get specific clarification. Explicit prefixes remain a diagnostic interface.
+unsupported effects get specific clarification. An uncertain classifier proposal falls back to
+tool-free chat so Alfie can answer from owner-only local memory or ask a specific follow-up without
+receiving external capabilities. Explicit prefixes remain a diagnostic interface.
 
 The four-container browser/security build and initial task permissions are deployed on the VPS.
 Public research and disposable interactive browsing use its worker. Google operations run in the gateway without
@@ -29,22 +31,27 @@ The first proposal exposed a dispatcher mismatch; after the deployed fix, the ap
 action succeeded and a read-only search found exactly one matching folder.
 
 Mandatory task grants now gate Telegram entry, cron entry, agent context and tool dispatch.
-Natural-language requests receive one fixed task mode. Supported Google writes proceed directly
+Natural-language requests receive one fixed effect mode. `private-read` permits bounded reads
+across Google services but has no public, persistence or mutation capability. A write task may use
+bounded private reads to identify its target, then propose one matching effect. Supported Google writes proceed directly
 to the separate immutable exact-action review; the earlier redundant task-scope confirmation was
 removed. Read tasks cannot propose writes. Every task has fresh history and no project context or
-background memory updates. Public tasks receive no private memory or Google tools. Chat and
-memory-edit tasks alone may load the bounded local memory snapshot; only memory-edit tasks can
-change it. Shell, delegation, general scheduling and messaging tools remain unavailable.
-Voice notes are transcribed before classification. Photographs are chat-only and vision/OCR text
-is explicitly untrusted; documents, audio files and video remain blocked.
+background memory updates. Public tasks receive no private memory or Google tools. Only tool-free
+chat loads the bounded local memory snapshot. Memory tasks can add one fact but cannot read,
+replace or delete old memory. Shell, delegation, general scheduling and messaging remain unavailable.
+Voice notes are transcribed before classification by the `media/` subsystem. Photographs use the
+configured model vision path but remain chat-only, and vision/OCR text is explicitly untrusted;
+documents, ordinary audio files and video remain blocked. Deployed acceptance now exercises an
+actual owner voice clip; synthetic media gates were removed while the project remains in active WIP.
 The one active reminder has a reviewed tool-free grant; two completed reminders remain disabled.
 Two hash-checked fixed scripts remain permitted. Schedules and destinations were preserved.
-New reminders use a narrow connector that forces owner delivery and tool-free jobs; it cannot
-schedule scripts, monitors, alternate destinations, tools or chained context. Existing reviewed
+New reminders use a narrow connector that forces owner delivery and tool-free jobs; cancellation
+pauses instead of deleting. It cannot schedule scripts, monitors, alternate destinations, tools
+or chained context. Existing reviewed
 cron jobs retain their frozen grants.
 See [task-permissions/README.md](task-permissions/README.md) for modes and limitations.
-Private reads automatically pin the first bounded selector from the fresh owner task, with
-returned-ID access and no in-task query expansion. Public browsing runs only in the credential-free
+Private reads allow up to eight bounded selectors and 256 KiB in a task whose only destination is
+the authenticated owner. Public browsing runs only in the credential-free
 disposable worker and cannot receive private task context. Private exports and isolation against
 gateway code compromise remain open. Installed-runtime schemas, denial paths, a real public
 browser open/close, reminder listing and synthetic intent proposals passed after deployment.
@@ -85,6 +92,7 @@ tests are deferred by owner direction and are not implementation release blocker
 | `web-search/` | Search/read/analyse loop and shared worker server/image |
 | `web-browser/` | Interactive public browsing; shares the research worker container |
 | `reminders/` | Narrow owner-only reminder connector over validated tool-free cron jobs |
+| `media/` | Telegram voice/photo preprocessing and pinned local STT configuration |
 | `egress/` | Squid destination policy |
 | `deployment/` | Four-container cutover, resource limits, firewall and acceptance checks |
 
@@ -105,7 +113,7 @@ tests are deferred by owner direction and are not implementation release blocker
 | Memory | Enforced ceilings: gateway 1024 MiB, sandbox 512 MiB, worker 1280 MiB, egress 128 MiB; browser starts on demand |
 | Persistent facts | Local holographic fact store + SQLite records; no external memory service |
 | Scheduled work | Deterministic `no_agent` scripts, model calls only when input exists; no agent-driven email polling |
-| Voice | Local faster-whisper `base` |
+| Voice | `media/`: local pinned faster-whisper `base`; real spoken-audio release fixture |
 | Search/extraction | Tavily and Firecrawl, currently keyless; no provider keys in public worker |
 | Timezone | Configured home timezone; scheduled tasks and travelling owner use their explicit current timezone |
 
@@ -242,7 +250,11 @@ trips and bills. USER.md and MEMORY.md provide bounded hot context. Raw mail exp
 weekly; do not share personal records with the browser worker. SQLite WAL databases must be
 mounted as directories so database and -wal/-shm files refer to the same storage.
 
-Voice transcription uses faster-whisper `base`, installed via gateway lazy dependencies.
+The `media/` subsystem owns Telegram voice/photo preprocessing before task classification. Voice
+transcription uses pinned faster-whisper `base` in the gateway's durable optional-dependency
+target. Its short-voice profile disables the redundant VAD pass and retains explicit confidence
+filtering; photographs use the configured model vision path. Media content grants no authority.
+Actual Telegram use is the current WIP integration check. See `media/README.md`.
 Keep the venv PATH patch at `/etc/profile.d/99-hermes-venv.sh`; verify actual execution paths.
 Reminders use Hermes cron; `email-watch` and quota alerts are scripts. Existing expiry operations
 remain operator-managed. Encrypted off-host backups use the pinned Drive backup folder manually,
@@ -294,11 +306,11 @@ and numbered email titles, unindented details and an explicit Open email link.
 
 - P0 natural-language routing and proportional confirmation friction are deployed. Continue
   paraphrase/use-case regression testing while preserving task isolation and exact-action approval.
-- Extend the deployed [task permissions contract](deployment/task-permissions.md): classify
+- Maintain the deployed [task permissions contract](deployment/task-permissions.md): classify
   every source before execution; bind readable data, permitted actions/destinations and durable
   state changes independently. Email search cannot propose sends; public research cannot write
-  personal memory or accounts. Service/operation and pinned selector/result-ID enforcement
-  are deployed. Reviewed private exports remain unavailable.
+  personal memory or accounts. Effect separation, bounded private reads and exact-action write
+  reviews are deployed. Reviewed private exports remain unavailable.
 - Decide whether to retain or separately approve deletion of the synthetic Drive test folder.
 - Enforce private/public task modes across all tools; audit alternate gateway write/memory/scheduling
   paths, enrich resource reviews, and add restricted personal-record lookup/promotion.
